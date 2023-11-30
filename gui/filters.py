@@ -1,13 +1,12 @@
 from PIL import Image, ImageEnhance
 
-
-'''
-Enhances brightness of the img
-
-img: PIL image
-val: percentage; 1.0 = no change, 0.5 = decrease by 50%, 1.5 = increase by 50%
-'''
 def brightness(img, val):
+    '''
+    Enhances brightness of the img
+
+    img: PIL image
+    val: percentage; 1.0 = no change, 0.5 = decrease by 50%, 1.5 = increase by 50%
+    '''
     enhancer = ImageEnhance.Brightness(img)
     return enhancer.enhance(val)
 
@@ -22,3 +21,17 @@ def contrast(img, val):
 def sharpness(img, val):
     enhancer = ImageEnhance.Sharpness(img)
     return enhancer.enhance(val)
+
+
+# (name, func_ptr, args_dict)
+FILTERS = {
+    'bright+10': (brightness, {'val': 1.1}),
+    'bright-10': (brightness, {'val': 0.9}),
+    'color_bal+': (color_balance, {'val': 2.0}),
+    'color_bal-': (color_balance, {'val': 0.5}),
+    'contrast+10': (contrast, {'val': 1.1}),
+    'contrast-10': (contrast, {'val': 0.9}),
+    'sharpness+': (sharpness, {'val': 2.0}),
+    'sharpness-': (sharpness, {'val': 0.0})
+    #TODO: channel mixing
+}

@@ -9,8 +9,7 @@ import time
 import os
 
 # Modules
-import utils
-import filters
+from filters import FILTERS
 
 #### GUI HELPERS ###########################################################
 def set_size(element, size):
@@ -22,14 +21,14 @@ def set_size(element, size):
         element.Widget.pack_propagate(0)
         element.set_size(size)
 
-def gen_tile(event, i, curr_img):
-    img_bytes = get_img_bytes(curr_img)
-    return [
-        [sg.Frame(event + str(i), layout=[
-            [sg.Image(data=img_bytes, size=(100,100))],
-            [sg.Button("Remove", key=f'-REMOVE-{i}')]
-        ])]
-    ]
+# def gen_tile(event, i, curr_img):
+#     img_bytes = get_img_bytes(curr_img)
+#     return [
+#         [sg.Frame(event + str(i), layout=[
+#             [sg.Image(data=img_bytes, size=(100,100))],
+#             [sg.Button("Remove", key=f'-REMOVE-{i}')]
+#         ])]
+#     ]
 
 def gen_filter_group(group):
     name = group[0]
@@ -60,28 +59,24 @@ THUMBNAIL_SIZE = (200,200)
 MAIN_SIZE = (800,800)
 ##########################
 
-# (name, func_ptr, args_dict)
-FILTERS = {
-    'bright+10': (filters.brightness, {'val': 1.1}),
-    'bright-10': (filters.brightness, {'val': 0.9}),
-    'color_bal+': (filters.color_balance, {'val': 2.0}),
-    'color_bal-': (filters.color_balance, {'val': 0.5}),
-    'contrast+10': (filters.contrast, {'val': 1.1}),
-    'contrast-10': (filters.contrast, {'val': 0.9}),
-    'sharpness+': (filters.sharpness, {'val': 2.0}),
-    'sharpness-': (filters.sharpness, {'val': 0.0})
-    #TODO: channel mixing
-}
+# # (name, func_ptr, args_dict)
+# FILTERS = {
+#     'bright+10': (filters.brightness, {'val': 1.1}),
+#     'bright-10': (filters.brightness, {'val': 0.9}),
+#     'color_bal+': (filters.color_balance, {'val': 2.0}),
+#     'color_bal-': (filters.color_balance, {'val': 0.5}),
+#     'contrast+10': (filters.contrast, {'val': 1.1}),
+#     'contrast-10': (filters.contrast, {'val': 0.9}),
+#     'sharpness+': (filters.sharpness, {'val': 2.0}),
+#     'sharpness-': (filters.sharpness, {'val': 0.0})
+#     #TODO: channel mixing
+# }
 
 FILTER_GROUPS = [
     ('Brightness', ['bright-10', 'bright+10']),
     ('Color Balance', ['color_bal-', 'color_bal+']),
     ('Contrast', ['contrast-10', 'contrast+10']),
     ('Sharpness', ['sharpness-', 'sharpness+']),
-]
-
-PREVIEWS = [
-    './red.png', './green.png', './blue.png'
 ]
 
 MAX_FILTER_APPLICATIONS = 5
@@ -100,17 +95,24 @@ main_col = sg.Column(
     key="-MAIN-", 
     size=SIZES['-MAIN-'])
 
-next_btns = [[sg.Button("<", key="-PREV-"), sg.Text("0/0", key="-LABEL_NUM_IMG-"), sg.Button(">", key="-NEXT-")]]
+next_btns = [[sg.Button("<", key="-PREV-"), sg.Text("0/0", key="-LABEL_NUM_IMG-"), sg.Button(">", key="-NEXT-"), 
+              sg.Push(), 
+              sg.Text(f"Thumb Size: {THUMBNAIL_SIZE}", key='-LABEL_THUMBSIZE-'), sg.Button("-", key='-THUMB_M-'), sg.Button("+", key='-THUMB_P-')]]
 hist_btns = [[sg.Button("Undo", key="-UNDO-"), sg.Button("Redo", key="-REDO-"), sg.Text(f"0/{MAX_FILTER_APPLICATIONS}", key="-LABEL_NUM_APPS-")]]
 filt_btns = [[gen_filter_group(group)] for group in FILTER_GROUPS]
-filter_col = sg.Column((next_btns + hist_btns + filt_btns))
+filter_col = sg.Column((next_btns + hist_btns + filt_btns), scrollable=True, vertical_scroll_only=True, size_subsample_height=1)
 
-hist_col = sg.Column([],
-    scrollable=True, vertical_scroll_only=True, 
-    # size_subsample_height=1, 
-    size=SIZES['-SIDE-'],
-    justification='c',
-    key="-HIST-")
+#TODO: figure out how to place two cols next to each other properly for layout to work
+# Two col layout
+# filt_col_alt1 = sg.Column(filt_btns[:len(filt_btns)//2])
+# filt_col_alt2 = sg.Column(filt_btns[len(filt_btns)//2:])
+# filt_col_alt = sg.Column([[filt_col_alt1, sg.HSeparator(), filt_col_alt2]])
+# hist_col = sg.Column([],
+#     scrollable=True, vertical_scroll_only=True, 
+#     # size_subsample_height=1, 
+#     size=SIZES['-SIDE-'],
+#     justification='c',
+#     key="-HIST-")
 
 # main_layout = [[main_col, filter_col, hist_col]]
 main_layout = [[main_col, filter_col]]
@@ -159,7 +161,8 @@ class FilterHistory:
         # self.load()
 
     def __repr__(self) -> str:
-        return '{' + self.filename + ', ' + str(self.get_filts()) + '}'
+        # return '{' + self.filename + ', ' + str(self.get_filts()) + '}'
+        return self.filename + ' ' + str(self.get_filts())
 
     def clean(self):
         '''
@@ -253,6 +256,8 @@ class FilterHistory:
         return True
 
 class GUI:
+    thumb_size = THUMBNAIL_SIZE # To allow rescaling of thumbnails if screen is too small
+
     cur_dir = None
     num_dir_images = 0
 
@@ -261,7 +266,7 @@ class GUI:
     pil_thumbnail = None
     filt_hist = []
 
-    main_img_size = MAIN_SIZE #TODO: work this out from aspect ratio and main max size (?)
+    main_img_size = MAIN_SIZE
     curr_win_size = (0,0)
 
     def load_img(self):
@@ -285,7 +290,7 @@ class GUI:
         #TODO: this might be making performance bad; maybe b/c now have undo/redo just get rid of the previews? but they are nice
         
         # Apply all filters to thumnail and update previews
-        self.pil_thumbnail = self.pil_cur_img.resize(THUMBNAIL_SIZE)
+        self.pil_thumbnail = self.pil_cur_img.resize(self.thumb_size)
         for key, value in FILTERS.items():
             func, args = value
 
@@ -303,10 +308,10 @@ class GUI:
             if event == sg.WIN_CLOSED:
                 break
 
-            # TODO: here can handle resize events
-            if not utils.vec_equal2d(self.curr_win_size, window.size):
-                self.curr_win_size = window.size
-                # set_size(window['-HIST-'], (SIZES['-SIDE-'][0], self.curr_win_size[1]-WIN_PAD))
+            # # TODO: here can handle resize events
+            # if not utils.vec_equal2d(self.curr_win_size, window.size):
+            #     self.curr_win_size = window.size
+            #     # set_size(window['-HIST-'], (SIZES['-SIDE-'][0], self.curr_win_size[1]-WIN_PAD))
 
             if event == '-UNDO-':
                 if self.filt_hist[self.cur_img_ind].undo():
@@ -341,6 +346,24 @@ class GUI:
 
                     # Change label
                     window['-LABEL_NUM_IMG-'].update(f'{self.cur_img_ind+1}/{self.num_dir_images}')
+
+            if event == '-THUMB_M-':
+                # Don't resize if too small
+                if self.thumb_size[0] > 20:
+                    self.thumb_size = (self.thumb_size[0] - 20, self.thumb_size[1] - 20)
+                    self.regen_thumbs()
+
+                    # Set label
+                    window['-LABEL_THUMBSIZE-'].update(f'Thumb Size: {self.thumb_size}')
+
+            if event == '-THUMB_P-':
+                # Don't resize if too large
+                if self.thumb_size[0] < 400:
+                    self.thumb_size = (self.thumb_size[0] + 20, self.thumb_size[1] + 20)
+                    self.regen_thumbs()
+
+                    # Set label
+                    window['-LABEL_THUMBSIZE-'].update(f'Thumb Size: {self.thumb_size}')
             
             if "-THUMB-" in event:
                 # print("FILTER:", event)
@@ -392,7 +415,12 @@ class GUI:
 
                     # TODO make this better, json, or convert it to a numpy array and do the numpy.savetxt so we can then load it easily in the other one
                     with open(f'{path}/{export_name}.txt', "w") as f:
-                        f.write(str(self.filt_hist))
+                        # f.write(str(self.filt_hist))
+                        f.write(str(len(self.filt_hist)))
+                        f.write('\n')
+                        for hist in self.filt_hist:
+                            f.write(str(hist))
+                            f.write('\n')
                     
                     #np.savetxt(f'{self.cur_dir}/export.npy', np.array(self.filt_hist))
 

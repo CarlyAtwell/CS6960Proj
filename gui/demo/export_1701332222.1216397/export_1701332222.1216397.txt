@@ -1,1 +1,0 @@
-[{demo.jpg, ['bright-10', 'color_bal-', 'color_bal-']}, {other.png, ['color_bal+', 'color_bal+', 'color_bal+', 'color_bal+', 'color_bal+']}, {Space Cat.jpg, ['sharpness+', 'sharpness+', 'sharpness+', 'sharpness+', 'sharpness+']}]
