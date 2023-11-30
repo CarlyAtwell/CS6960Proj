@@ -5,6 +5,8 @@ import io
 from os import listdir
 from os.path import isfile, join
 from PIL import Image, ImageEnhance
+import time
+import os
 
 # Modules
 import utils
@@ -167,6 +169,7 @@ class FilterHistory:
 
         Use load() to reload data
         '''
+        #TODO: I think don't bother with this maybe so don't have to do load() again, might make things a little faster
         self.images = []
         self.base_img = None
 
@@ -188,11 +191,11 @@ class FilterHistory:
     def get_num_active(self):
         return self.ind + 1
 
-    def load(self):
+    def load(self, do_rescale=True):
        '''
        Reloads images from the current filter pool
        '''
-       self.base_img = rescale(Image.open(self.filepath))
+       self.base_img = rescale(Image.open(self.filepath)) if do_rescale else Image.open(self.filepath)
 
        cur_ind = self.ind
 
@@ -205,7 +208,6 @@ class FilterHistory:
     #    cur_img = self.base_img
     #    for filter in self.filters:
     #        func, args = FILTERS[filter]
-
     #        cur_img = func(cur_img, **args)
     #        self.images.append(cur_img)
     #        self.ind += 1
@@ -228,7 +230,7 @@ class FilterHistory:
         self.filters.append(filter)
         self.ind += 1
 
-        print(self.filters)
+        # print(self.filters)
 
     def set_active(self, ind):
         '''
@@ -267,7 +269,7 @@ class GUI:
         self.pil_cur_img = cur_hist.get_cur()
 
         # Set filter text
-        window['-LABEL-'].update(str(cur_hist.get_filts()))
+        window['-LABEL-'].update('Applied: ' + str(cur_hist.get_filts()))
 
         # Set preview
         window['-MAIN_IMAGE-'].update(data=get_pil_data(self.pil_cur_img), size=self.main_img_size)
@@ -341,7 +343,7 @@ class GUI:
                     window['-LABEL_NUM_IMG-'].update(f'{self.cur_img_ind+1}/{self.num_dir_images}')
             
             if "-THUMB-" in event:
-                print("FILTER:", event)
+                # print("FILTER:", event)
 
                 # Retrieve filter key
                 key = event[7:]
@@ -377,9 +379,34 @@ class GUI:
                     # Change label
                     window['-LABEL_NUM_IMG-'].update(f'{self.cur_img_ind+1}/{self.num_dir_images}')
             if event == '-EXPORT-':
-                #TODO
-                print('\n\nEXPORT: ', self.filt_hist)
-                print('\n\n')
+                # Only if exists
+                if self.cur_dir:
+
+                    print('\n\nEXPORT: ', self.filt_hist)
+                    print('\n\n')
+
+                    export_name = f'export_{time.time()}'
+                    path = f'{self.cur_dir}/{export_name}'
+                    if not os.path.exists(path):
+                        os.makedirs(path)
+
+                    # TODO make this better, json, or convert it to a numpy array and do the numpy.savetxt so we can then load it easily in the other one
+                    with open(f'{path}/{export_name}.txt', "w") as f:
+                        f.write(str(self.filt_hist))
+                    
+                    #np.savetxt(f'{self.cur_dir}/export.npy', np.array(self.filt_hist))
+
+                    # Save output images for this export
+                    for hist in self.filt_hist:
+                        # We use rescale inside hist normally, so now don't do that
+                        hist.load(do_rescale=False)
+                        pil_img = hist.get_cur()
+                        pil_img.save(f'{path}/out_{hist.filename}')
+                        # Now unload
+                        hist.clean()
+
+                    # Reload the current one
+                    self.filt_hist[self.cur_img_ind].load()
 
         window.close()
 
