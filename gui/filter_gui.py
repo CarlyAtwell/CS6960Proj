@@ -9,8 +9,6 @@ import time
 import os
 
 # Modules
-import utils
-# import filters
 from filters import FILTERS
 
 #### GUI HELPERS ###########################################################
@@ -23,14 +21,14 @@ def set_size(element, size):
         element.Widget.pack_propagate(0)
         element.set_size(size)
 
-def gen_tile(event, i, curr_img):
-    img_bytes = get_img_bytes(curr_img)
-    return [
-        [sg.Frame(event + str(i), layout=[
-            [sg.Image(data=img_bytes, size=(100,100))],
-            [sg.Button("Remove", key=f'-REMOVE-{i}')]
-        ])]
-    ]
+# def gen_tile(event, i, curr_img):
+#     img_bytes = get_img_bytes(curr_img)
+#     return [
+#         [sg.Frame(event + str(i), layout=[
+#             [sg.Image(data=img_bytes, size=(100,100))],
+#             [sg.Button("Remove", key=f'-REMOVE-{i}')]
+#         ])]
+#     ]
 
 def gen_filter_group(group):
     name = group[0]
@@ -79,10 +77,6 @@ FILTER_GROUPS = [
     ('Color Balance', ['color_bal-', 'color_bal+']),
     ('Contrast', ['contrast-10', 'contrast+10']),
     ('Sharpness', ['sharpness-', 'sharpness+']),
-]
-
-PREVIEWS = [
-    './red.png', './green.png', './blue.png'
 ]
 
 MAX_FILTER_APPLICATIONS = 5
