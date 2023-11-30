@@ -1,4 +1,0 @@
-3
-demo.jpg ['bright+10', 'bright+10', 'color_bal+']
-other.png ['color_bal+', 'contrast+10']
-Space Cat.jpg ['color_bal+', 'sharpness+', 'sharpness+', 'sharpness+', 'sharpness+']

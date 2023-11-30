@@ -47,6 +47,8 @@ def gen_filter_group(group):
 ### CONFIG #################################################################
 default_path = './none.png'
 
+DEFAULT_DIR = './default'
+
 # GUI CONSTANTS ##########
 SIZES = {
     '-MAIN-': (800, 1000),
@@ -162,7 +164,8 @@ class FilterHistory:
 
     def __repr__(self) -> str:
         # return '{' + self.filename + ', ' + str(self.get_filts()) + '}'
-        return self.filename + ' ' + str(self.get_filts())
+        #return self.filename + ' ' + str(self.get_filts())
+        return self.filename + ' ' + 'out_' + self.filename + ' ' + str(self.get_filts())
 
     def clean(self):
         '''
@@ -302,11 +305,35 @@ class GUI:
         #TODO: if end up drawing all history in side panel
         pass
 
+    def load_folder(self, dir):
+        files = [file for file in listdir(dir) if isfile(join(dir, file)) and file.endswith(('.png', '.jpg', '.jpeg', '.tiff', '.bmp', '.gif'))]
+        if files.count == 0:
+            return
+
+        self.cur_dir = dir
+        self.num_dir_images = len(files)
+        print(f"Found {self.num_dir_images} images ('.png', '.jpg', '.jpeg', '.tiff', '.bmp', '.gif')")
+        # Allocate history for each file we'll be filtering
+        self.filt_hist = [FilterHistory(dir, file) for file in files]
+
+        self.cur_img_ind = 0
+        self.filt_hist[self.cur_img_ind].load()
+        self.load_img()
+
+        # Change label
+        window['-LABEL_NUM_IMG-'].update(f'{self.cur_img_ind+1}/{self.num_dir_images}')
+
     def main(self):
+        init = False
+
         while True:
             event, values = window.read(timeout = 50)
             if event == sg.WIN_CLOSED:
                 break
+
+            if not init:
+                self.load_folder(DEFAULT_DIR)
+                init = True
 
             # # TODO: here can handle resize events
             # if not utils.vec_equal2d(self.curr_win_size, window.size):
@@ -385,22 +412,23 @@ class GUI:
                 print('OPENED:', dir)
 
                 if dir:
-                    files = [file for file in listdir(dir) if isfile(join(dir, file)) and file.endswith(('.png', '.jpg', '.jpeg', '.tiff', '.bmp', '.gif'))]
-                    if files.count == 0:
-                        continue
+                    self.load_folder(dir)
+                    # files = [file for file in listdir(dir) if isfile(join(dir, file)) and file.endswith(('.png', '.jpg', '.jpeg', '.tiff', '.bmp', '.gif'))]
+                    # if files.count == 0:
+                    #     continue
 
-                    self.cur_dir = dir
-                    self.num_dir_images = len(files)
-                    print(f"Found {self.num_dir_images} images ('.png', '.jpg', '.jpeg', '.tiff', '.bmp', '.gif')")
-                    # Allocate history for each file we'll be filtering
-                    self.filt_hist = [FilterHistory(dir, file) for file in files]
+                    # self.cur_dir = dir
+                    # self.num_dir_images = len(files)
+                    # print(f"Found {self.num_dir_images} images ('.png', '.jpg', '.jpeg', '.tiff', '.bmp', '.gif')")
+                    # # Allocate history for each file we'll be filtering
+                    # self.filt_hist = [FilterHistory(dir, file) for file in files]
 
-                    self.cur_img_ind = 0
-                    self.filt_hist[self.cur_img_ind].load()
-                    self.load_img()
+                    # self.cur_img_ind = 0
+                    # self.filt_hist[self.cur_img_ind].load()
+                    # self.load_img()
 
-                    # Change label
-                    window['-LABEL_NUM_IMG-'].update(f'{self.cur_img_ind+1}/{self.num_dir_images}')
+                    # # Change label
+                    # window['-LABEL_NUM_IMG-'].update(f'{self.cur_img_ind+1}/{self.num_dir_images}')
             if event == '-EXPORT-':
                 # Only if exists
                 if self.cur_dir:
