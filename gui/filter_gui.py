@@ -81,12 +81,14 @@ FILTER_GROUPS = [
 PREVIEWS = [
     './red.png', './green.png', './blue.png'
 ]
+
+MAX_FILTER_APPLICATIONS = 5
 ############################################################################
 
 main_col = sg.Column(
     [
         [sg.Column([
-            [sg.Button("Load", key='-LOAD-'), sg.Button("Folder", key='-FOLDER-')]
+            [sg.Button("Load Folder", key='-FOLDER-'), sg.Button("Export Trajectories", key='-EXPORT-')]
             ], justification='l')],
         
         [sg.Image(default_path, key = '-MAIN_IMAGE-', size=MAIN_SIZE)],
@@ -96,9 +98,10 @@ main_col = sg.Column(
     key="-MAIN-", 
     size=SIZES['-MAIN-'])
 
-hist_btns = [[sg.Button("Undo", key="-UNDO-"), sg.Button("Redo", key="-REDO-")]]
+next_btns = [[sg.Button("<", key="-PREV-"), sg.Text("0/0", key="-LABEL_NUM_IMG-"), sg.Button(">", key="-NEXT-")]]
+hist_btns = [[sg.Button("Undo", key="-UNDO-"), sg.Button("Redo", key="-REDO-"), sg.Text(f"0/{MAX_FILTER_APPLICATIONS}", key="-LABEL_NUM_APPS-")]]
 filt_btns = [[gen_filter_group(group)] for group in FILTER_GROUPS]
-filter_col = sg.Column((hist_btns + filt_btns))
+filter_col = sg.Column((next_btns + hist_btns + filt_btns))
 
 hist_col = sg.Column([],
     scrollable=True, vertical_scroll_only=True, 
@@ -120,6 +123,25 @@ def get_pil_data(img):
     img.save(bio, format="PNG")
     return bio.getvalue()
 
+def rescale(img):
+    '''
+    Rescale if too big to fit
+    '''
+    largest_dim = max(img.size)
+    largest_ind = 0 if img.size[0] == largest_dim else 1
+
+    output = img
+
+    if largest_dim > MAIN_SIZE[largest_ind]:
+        scale = MAIN_SIZE[largest_ind] / largest_dim
+
+        rescale_size = (int(img.size[0] * scale), int(img.size[1] * scale))
+
+        output = img.resize(rescale_size)
+    
+    print("RESCALE: ", img.size, " --> ", output.size)
+    return output
+
 class FilterHistory:
     filepath = None
     filename = None
@@ -132,7 +154,10 @@ class FilterHistory:
         self.filename = filename
         self.filepath = path + '/' + filename
 
-        self.load()
+        # self.load()
+
+    def __repr__(self) -> str:
+        return '{' + self.filename + ', ' + str(self.get_filts()) + '}'
 
     def clean(self):
         '''
@@ -159,12 +184,15 @@ class FilterHistory:
         '''
 
         return self.filters[:self.ind+1]
+    
+    def get_num_active(self):
+        return self.ind + 1
 
     def load(self):
        '''
        Reloads images from the current filter pool
        '''
-       self.base_img = Image.open(self.filepath)
+       self.base_img = rescale(Image.open(self.filepath))
 
        cur_ind = self.ind
 
@@ -224,6 +252,7 @@ class FilterHistory:
 
 class GUI:
     cur_dir = None
+    num_dir_images = 0
 
     cur_img_ind = -1
     pil_cur_img = None
@@ -234,10 +263,11 @@ class GUI:
     curr_win_size = (0,0)
 
     def load_img(self):
-        self.pil_cur_img = self.filt_hist[self.cur_img_ind].get_cur()
+        cur_hist = self.filt_hist[self.cur_img_ind]
+        self.pil_cur_img = cur_hist.get_cur()
 
         # Set filter text
-        window['-LABEL-'].update(str(self.filt_hist[self.cur_img_ind].get_filts()))
+        window['-LABEL-'].update(str(cur_hist.get_filts()))
 
         # Set preview
         window['-MAIN_IMAGE-'].update(data=get_pil_data(self.pil_cur_img), size=self.main_img_size)
@@ -245,6 +275,9 @@ class GUI:
 
         # Regen thumbs
         self.regen_thumbs()
+
+        # Update applications label
+        window['-LABEL_NUM_APPS-'].update(f'{cur_hist.get_num_active()}/{MAX_FILTER_APPLICATIONS}')
 
     def regen_thumbs(self):
         #TODO: this might be making performance bad; maybe b/c now have undo/redo just get rid of the previews? but they are nice
@@ -280,6 +313,32 @@ class GUI:
             if event == '-REDO-':
                 if self.filt_hist[self.cur_img_ind].redo():
                     self.load_img()
+
+            if event == '-PREV-':
+                if self.cur_img_ind > 0:
+                    self.filt_hist[self.cur_img_ind].clean()
+                    
+                    self.cur_img_ind -= 1
+                    # Reload cleaned data in history
+                    self.filt_hist[self.cur_img_ind].load()
+                    # Load image
+                    self.load_img()
+
+                    # Change label
+                    window['-LABEL_NUM_IMG-'].update(f'{self.cur_img_ind+1}/{self.num_dir_images}')
+            
+            if event == '-NEXT-':
+                if self.cur_img_ind < self.num_dir_images - 1:
+                    self.filt_hist[self.cur_img_ind].clean()
+                    
+                    self.cur_img_ind += 1
+                    # Reload cleaned data in history
+                    self.filt_hist[self.cur_img_ind].load()
+                    # Load image
+                    self.load_img()
+
+                    # Change label
+                    window['-LABEL_NUM_IMG-'].update(f'{self.cur_img_ind+1}/{self.num_dir_images}')
             
             if "-THUMB-" in event:
                 print("FILTER:", event)
@@ -289,25 +348,39 @@ class GUI:
                 
                 # Apply filter, update history
                 cur_hist = self.filt_hist[self.cur_img_ind]
-                cur_hist.apply(key)
 
-                self.load_img()
+                # Don't apply if more than max allowed
+                if cur_hist.get_num_active() < MAX_FILTER_APPLICATIONS:
+                    cur_hist.apply(key)
+
+                    self.load_img()
 
             if event == '-FOLDER-':
                 dir = sg.popup_get_folder('Open', no_window = True)
                 print('OPENED:', dir)
 
                 if dir:
-                    files = [file for file in listdir(dir) if isfile(join(dir, file))]
+                    files = [file for file in listdir(dir) if isfile(join(dir, file)) and file.endswith(('.png', '.jpg', '.jpeg', '.tiff', '.bmp', '.gif'))]
                     if files.count == 0:
                         continue
 
                     self.cur_dir = dir
+                    self.num_dir_images = len(files)
+                    print(f"Found {self.num_dir_images} images ('.png', '.jpg', '.jpeg', '.tiff', '.bmp', '.gif')")
                     # Allocate history for each file we'll be filtering
                     self.filt_hist = [FilterHistory(dir, file) for file in files]
 
                     self.cur_img_ind = 0
-                    self.load_img()        
+                    self.filt_hist[self.cur_img_ind].load()
+                    self.load_img()
+
+                    # Change label
+                    window['-LABEL_NUM_IMG-'].update(f'{self.cur_img_ind+1}/{self.num_dir_images}')
+            if event == '-EXPORT-':
+                #TODO
+                print('\n\nEXPORT: ', self.filt_hist)
+                print('\n\n')
+
         window.close()
 
 ############################################################################
