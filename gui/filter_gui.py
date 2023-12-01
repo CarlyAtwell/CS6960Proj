@@ -82,13 +82,15 @@ FILTER_GROUPS = [
     ('Sharpness', ['sharpness-', 'sharpness+']),
 ]
 
-MAX_FILTER_APPLICATIONS = 5
+MAX_FILTER_APPLICATIONS = 10
 ############################################################################
 
 main_col = sg.Column(
     [
         [sg.Column([
-            [sg.Button("Load Folder", key='-FOLDER-'), sg.Button("Export Trajectories", key='-EXPORT-')]
+            [sg.Button("Load Folder", key='-FOLDER-'), sg.Button("Export Trajectories", key='-EXPORT-')],
+            [sg.Input('', key='-INPUT_EXPORT-')],
+            [sg.Text('Export: <none>', key='-LABEL_EXPORT-', visible=False)]
             ], justification='l')],
         
         [sg.Image(default_path, key = '-MAIN_IMAGE-', size=MAIN_SIZE)],
@@ -436,7 +438,11 @@ class GUI:
             if event == '-EXPORT-':
                 # Only if exists
                 if self.cur_dir:
-                    export_name = f'export_{time.time()}'
+                    export_name = values['-INPUT_EXPORT-']
+                    
+                    # Default name if none
+                    if not export_name:
+                        export_name = f'export_{time.time()}' 
                     path = f'{self.cur_dir}/{export_name}'
                     if not os.path.exists(path):
                         os.makedirs(path)
@@ -467,7 +473,8 @@ class GUI:
                         # Now unload
                         hist.clean()
 
-                    print("Export Success")
+                    print("Export Success: ", export_name)
+                    window['-LABEL_EXPORT-'].update(f"Export: {path}", visible=True)
 
                     # Reload the current one
                     self.filt_hist[self.cur_img_ind].load()
