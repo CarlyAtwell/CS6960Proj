@@ -7,6 +7,7 @@ from os.path import isfile, join
 from PIL import Image, ImageEnhance
 import time
 import os
+import json
 
 # Modules
 from filters import FILTERS
@@ -162,10 +163,13 @@ class FilterHistory:
 
         # self.load()
 
-    def __repr__(self) -> str:
-        # return '{' + self.filename + ', ' + str(self.get_filts()) + '}'
-        #return self.filename + ' ' + str(self.get_filts())
-        return self.filename + ' ' + 'out_' + self.filename + ' ' + str(self.get_filts())
+    # def __repr__(self) -> str:
+    #     # return '{' + self.filename + ', ' + str(self.get_filts()) + '}'
+    #     #return self.filename + ' ' + str(self.get_filts())
+    #     return self.filename + ' ' + 'out_' + self.filename + ' ' + str(self.get_filts())
+
+    def get_export(self):
+        return (self.filename, 'out_' + self.filename, self.get_filts())
 
     def clean(self):
         '''
@@ -432,23 +436,25 @@ class GUI:
             if event == '-EXPORT-':
                 # Only if exists
                 if self.cur_dir:
-
-                    print('\n\nEXPORT: ', self.filt_hist)
-                    print('\n\n')
-
                     export_name = f'export_{time.time()}'
                     path = f'{self.cur_dir}/{export_name}'
                     if not os.path.exists(path):
                         os.makedirs(path)
 
-                    # TODO make this better, json, or convert it to a numpy array and do the numpy.savetxt so we can then load it easily in the other one
+                    # Outputs json
                     with open(f'{path}/{export_name}.txt', "w") as f:
-                        # f.write(str(self.filt_hist))
-                        f.write(str(len(self.filt_hist)))
-                        f.write('\n')
+                        export = []
                         for hist in self.filt_hist:
-                            f.write(str(hist))
-                            f.write('\n')
+                            export.append(hist.get_export())
+
+                        json.dump(export, f)
+
+                        # f.write(str(self.filt_hist))
+                        # f.write(str(len(self.filt_hist)))
+                        # f.write('\n')
+                        # for hist in self.filt_hist:
+                        #     f.write(str(hist))
+                        #     f.write('\n')
                     
                     #np.savetxt(f'{self.cur_dir}/export.npy', np.array(self.filt_hist))
 
@@ -460,6 +466,8 @@ class GUI:
                         pil_img.save(f'{path}/out_{hist.filename}')
                         # Now unload
                         hist.clean()
+
+                    print("Export Success")
 
                     # Reload the current one
                     self.filt_hist[self.cur_img_ind].load()

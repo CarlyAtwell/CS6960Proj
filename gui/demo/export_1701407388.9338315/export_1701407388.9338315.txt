@@ -1,0 +1,1 @@
+[["demo.jpg", "out_demo.jpg", ["contrast+10", "contrast+10"]], ["other.png", "out_other.png", ["color_bal-", "contrast+10"]], ["Space Cat.jpg", "out_Space Cat.jpg", ["sharpness+", "sharpness+", "sharpness+", "sharpness+"]]]
