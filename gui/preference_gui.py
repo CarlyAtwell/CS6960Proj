@@ -40,6 +40,9 @@ header_bar = sg.Column(
             sg.Button("Load Primary", key='-LOAD_PRIMARY-'), sg.Button("Load Secondary", key='-LOAD_SECONDARY-'), sg.Button("Start", key='-START-') #, sg.Push(), sg.Button("Reset", key='-RESET-')
         ],
         [
+            sg.Input("", key='-INPUT_EXPORT-'), sg.Button("Early Export", key='-EXPORT-')
+        ],
+        [
             sg.Text("Primary: <none>", key='-LABEL_PRIMARY-')
         ],
         [
@@ -153,12 +156,16 @@ class GUI:
         window['-IMAGE_LEFT-'].update(image_data=gui_utils.get_pil_data(imgs[self.image_shuffle[0]]), visible=True)
         window['-IMAGE_RIGHT-'].update(image_data=gui_utils.get_pil_data(imgs[self.image_shuffle[1]]), visible=True)
     
-    def export(self):
-        export_name = f'prefs_{time.time()}'
+    def export(self, export_name):            
+        # Default name if none
+        if not export_name:
+            export_name = f'prefs_{time.time()}' 
         # Outputs json
         outfile = f'./{export_name}.txt'
         with open(outfile, "w") as f:
             # Write out which folders got preferences from
+            # Write which folder get base images from
+            f.write(os.path.dirname(self.dir_primary) + '\n')
             # First is primary, second is secondary
             f.write(self.dir_primary + '\n')
             f.write(self.dir_secondary + '\n')
@@ -248,13 +255,19 @@ class GUI:
                 if self.next_image():
                     # Finished everything, do export
                     print("EXPORTING")
-                    outfile = self.export()
+                    outfile = self.export(export_name = values['-INPUT_EXPORT-'])
 
                     self.active = False
 
                     window['-LABEL_EXPORT-'].update(f"Export: {outfile}", visible=True)
 
-            #TODO: also have button for early export if anything
+            #if self.active and event == '-EXPORT-':
+            if event == '-EXPORT-':
+                # Do early export, keep app running
+                print("EARLY EXPORT")
+                outfile = self.export(export_name = values['-INPUT_EXPORT-'])
+                window['-LABEL_EXPORT-'].update(f"Export: {outfile}", visible=True)
+
 
         window.close()
 
