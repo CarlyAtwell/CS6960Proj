@@ -9,7 +9,9 @@ import numpy as np
 def mlp(sizes, activation=nn.Tanh, output_activation=nn.Identity):
     # Conv neural network for the policy
 
-    layers = [nn.Conv2d(3, 6, 5), activation, nn.MaxPool2d(2, 2), nn.Conv2d(6, 16, 5), activation, nn.MaxPool2d(2, 2), nn.Flatten() ]
+    layers = [nn.Conv2d(3, 6, 5), activation, nn.MaxPool2d(2, 2), 
+              nn.Conv2d(6, 18, 5), activation, nn.MaxPool2d(2, 2), 
+              nn.Conv2d(18, 32, 5), activation, nn.MaxPool2d(2, 2), nn.Flatten()]
     for j in range(len(sizes)-1):
         act = activation if j < len(sizes)-2 else output_activation
         layers += [nn.Linear(sizes[j], sizes[j+1]), act()]
@@ -34,8 +36,9 @@ class Net(nn.Module):
 
         self.conv1 = nn.Conv2d(3, 6, 5) # 3 img input channels (RGB), 6 5x5 Conv filters
         self.pool = nn.MaxPool2d(2, 2)
-        self.conv2 = nn.Conv2d(6, 16, 5)
-        self.fc1 = nn.Linear(16 * IMAGE_DIM, 120)
+        self.conv2 = nn.Conv2d(6, 18, 5)
+        self.conv3 = nn.Conv2d(18, 32, 5)
+        self.fc1 = nn.Linear(32 * IMAGE_DIM, 120)
         self.fc2 = nn.Linear(120, 84)
         self.fc3 = nn.Linear(84, FILTER_DIM)
 
@@ -50,6 +53,7 @@ class Net(nn.Module):
             #this method performs a forward pass through the network
             x = self.pool(F.relu(self.conv1(img_state)))
             x = self.pool(F.relu(self.conv2(x)))
+            x = self.pool(F.relu(self.conv3(x)))
             x = torch.flatten(x, 1) # flatten all dimensions except batch
             x = F.relu(self.fc1(x))
             x = F.relu(self.fc2(x))
