@@ -35,3 +35,22 @@ FILTERS = {
     'sharpness-': (sharpness, {'val': 0.0})
     #TODO: channel mixing
 }
+
+
+def apply_filter_chain(img, filters):
+    '''
+    Takes in Pillow image and applies a list of filters in order
+    '''
+    filtered = img.copy()
+    for filter in filters:
+        filtered = apply_filter(filtered)
+
+    return filtered
+
+def apply_filter(img, filter):
+    '''
+    Takes in Pillow image and applies a filter
+    '''
+
+    func, args = FILTERS[filter]
+    return func(img, **args)
