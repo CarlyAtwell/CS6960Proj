@@ -37,7 +37,7 @@ IMAGE_SIZE = (800,800)
 header_bar = sg.Column(
     [
         [
-            sg.Button("Load Primary", key='-LOAD_PRIMARY-'), sg.Button("Load Secondary", key='-LOAD_SECONDARY-'), sg.Button("Start", key='-START-') #, sg.Push(), sg.Button("Reset", key='-RESET-')
+            sg.Button("Load Primary", key='-LOAD_PRIMARY-'), sg.Button("Load Secondary", key='-LOAD_SECONDARY-'), sg.Button("Start", key='-START-'), sg.Text("0/0", key='-LABEL_ITER-')#, sg.Push(), sg.Button("Reset", key='-RESET-')
         ],
         [
             sg.Input("", key='-INPUT_EXPORT-'), sg.Button("Early Export", key='-EXPORT-')
@@ -141,6 +141,7 @@ class GUI:
 
         self.set_image()
         # window['-LABEL_PRIMARY-'].update(f"DEBUG {self.image_shuffle}")
+        window['-LABEL_ITER-'].update(f'{self.cur_img_ind+1}/{self.num_total_imgs}')
         return False
     
     def set_image(self):
