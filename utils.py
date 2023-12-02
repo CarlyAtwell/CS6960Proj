@@ -7,11 +7,9 @@ import numpy as np
 
 
 def mlp(sizes, activation=nn.Tanh, output_activation=nn.Identity):
-    # Build a feedforward neural network for the policy
+    # Conv neural network for the policy
 
-    # TODO: maybe change to use Convolutional NN since that is generally more effective on images
-
-    layers = []
+    layers = [nn.Conv2d(3, 6, 5), activation, nn.MaxPool2d(2, 2), nn.Conv2d(6, 16, 5), activation, nn.MaxPool2d(2, 2), nn.Flatten() ]
     for j in range(len(sizes)-1):
         act = activation if j < len(sizes)-2 else output_activation
         layers += [nn.Linear(sizes[j], sizes[j+1]), act()]
@@ -19,38 +17,44 @@ def mlp(sizes, activation=nn.Tanh, output_activation=nn.Identity):
 
 
 class Net(nn.Module):
-    ##TODO you can code this up using whatever methods you want, 
-    # but to work with the rest of the code make sure you
-    # at least implement the predict_reward function below
+    # Conv Neural Net for reward function trained on Human Pref data
 
     def __init__(self):
         super().__init__()
-        #TODO define network architecture. 
+        # defines CNN network architecture. 
         
-        # Hint, states  are X-dimensional -- DIM OF IMAGES + FILTER DIM
-        # This network should take in  inputs corresponding to the image pixels and applied filters
+        # States are of size IMAGE_DIM
+        # This network should take in  inputs corresponding to the image pixels and 
+        # output logits corresponding to possible filter actions
         
         # flattened image dim
-        IMAGE_DIM = None
+        IMAGE_DIM = 1024*1024
         # max number of filters, if < max # filters, just empty or 0 or filter that doesn't do anything or something
-        FILTER_DIM = 6
+        FILTER_DIM = 9
 
-        self.fc1 = nn.Linear(4,8)
-        self.fc2 = nn.Linear(8,8)
-        self.fc3 = nn.Linear(8,1)
+        self.conv1 = nn.Conv2d(3, 6, 5) # 3 img input channels (RGB), 6 5x5 Conv filters
+        self.pool = nn.MaxPool2d(2, 2)
+        self.conv2 = nn.Conv2d(6, 16, 5)
+        self.fc1 = nn.Linear(16 * IMAGE_DIM, 120)
+        self.fc2 = nn.Linear(120, 84)
+        self.fc3 = nn.Linear(84, FILTER_DIM)
 
    
     def predict_reward(self, traj):
         '''calculate cumulative return of trajectory, could be a trajectory with a single element'''
-        #TODO should take in a image + filters and output a scalar cumulative reward estimate
+        # should take in a trajectory of image states and filter actions and output a scalar cumulative reward estimate
+        # trajectory should be list of tuples of (img, filter_action), then (filtered_img, next_filter_action), etc. max 10
 
         cumulative_reward = 0
-        for state in traj:
+        for img_state, action in traj:
             #this method performs a forward pass through the network
-            x = F.relu(self.fc1(state))
-            x = self.fc2(x)
+            x = self.pool(F.relu(self.conv1(img_state)))
+            x = self.pool(F.relu(self.conv2(x)))
+            x = torch.flatten(x, 1) # flatten all dimensions except batch
+            x = F.relu(self.fc1(x))
+            x = F.relu(self.fc2(x))
             x = self.fc3(x)
-            cumulative_reward += x
+            cumulative_reward += x[action]
 
         return cumulative_reward
 
