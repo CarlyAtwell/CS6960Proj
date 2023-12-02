@@ -27,9 +27,9 @@ def reward_to_go(rews):
 def train(hidden_sizes=[32], lr=1e-2, epochs=50, batch_size=5000, reward=None, checkpoint = False, checkpoint_dir = "\."):
 
     # input dim for policy neural net: size of images
-    img_dim = None
+    img_dim = 1024 * 1024
     # num of actions: # of filter choices + stop action
-    num_acts = None
+    num_acts = 9
 
     # make core of policy network
     logits_net = mlp(sizes=[img_dim]+hidden_sizes+[num_acts])
@@ -62,7 +62,7 @@ def train(hidden_sizes=[32], lr=1e-2, epochs=50, batch_size=5000, reward=None, c
         batch_lens = []         # for measuring episode lengths
 
         # reset episode-specific variables
-        img = None               # TODO: first img comes from ? some sort of set of training images?
+        img = None               # TODO: first img comes from ? sample from some set of training images?
         done = False            # TODO: when STOP action is chosen instead of a filter to signal that episode is over
         ep_rews = []            # list for rewards accrued throughout ep
 
@@ -74,23 +74,28 @@ def train(hidden_sizes=[32], lr=1e-2, epochs=50, batch_size=5000, reward=None, c
 
             # act in the environment
             act = get_action(torch.as_tensor(img, dtype=torch.float32))
-            # obs, rew, done, _ = env.step(act)
-            if(act != 'STOP'):
-                # TODO: implement apply_filter function which will return the filtered image
-                img = apply_filter(img, act)
-
+            
+            # put image and selected action in tuple as single step trajectory for predict_reward func
+            img_act_pair = (img, act)
+            
             # predict reward from neural net with reward params trained from pref data
             device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-            torchified_state = torch.from_numpy(img).float().to(device)
+            torchified_state = torch.from_numpy(img_act_pair).float().to(device)
             r = reward.predict_reward(torchified_state.unsqueeze(0)).item()
             rew = r
+
+            # now apply filter/action to image
+            # saying action index 8 is STOP action, but maybe 0 makes more sense, idk?
+            if(act != 8):
+                # TODO: implement apply_filter function which will return the filtered image
+                img = apply_filter(img, act)
 
             # save action, reward
             batch_acts.append(act)
             ep_rews.append(rew)
 
             if act == 'STOP':
-                # if filtering episode is over, record info about episode
+                # if filtering this image is over, record info about episode
                 ep_ret, ep_len = sum(ep_rews), len(ep_rews)
                 batch_rets.append(ep_ret)
                 batch_lens.append(ep_len)
@@ -98,10 +103,10 @@ def train(hidden_sizes=[32], lr=1e-2, epochs=50, batch_size=5000, reward=None, c
                 # the weight for each logprob(a_t|s_t) is reward-to-go from t
                 batch_weights += list(reward_to_go(ep_rews))
 
-                # reset episode-specific variables
+                # reset episode-specific variables ################################## TODO: set image to next img from training set/folder, not None
                 img, done, ep_rews = None, False, []
 
-                # end experience loop if we have enough of it
+                # end this batch loop if we have enough of it
                 if len(batch_imgs) > batch_size:
                     break
 
