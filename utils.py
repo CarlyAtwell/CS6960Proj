@@ -59,23 +59,15 @@ class Net(nn.Module):
         for i in range(traj_size):
             img_state = states[i]
             action = actions[i]
-            # print(img_state.size())
+            # img_state.requires_grad = True
             #this method performs a forward pass through the network
             x = self.pool(F.relu(self.conv1(img_state)))
-            # print(x.size())
             x = self.pool(F.relu(self.conv2(x)))
-            # print(x.size())
             x = self.pool(F.relu(self.conv3(x)))
-            # print(x.size())
             x = torch.flatten(x, 1).squeeze() # flatten all dimensions except batch, then squeeze out the batch
-            # print(x.size())
             x = F.relu(self.fc1(x))
-            # print(x.size())
             x = F.relu(self.fc2(x))
-            # print(x.size())
             x = self.fc3(x)
-            # print(x.size())
-            # print(x)
             cumulative_reward += x[action]
 
         return cumulative_reward

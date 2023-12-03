@@ -95,7 +95,8 @@ def learn_reward(reward_network, optimizer, training_inputs, training_outputs, n
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     
     #We will use a cross entropy loss for pairwise preference learning
-    loss_criterion = nn.CrossEntropyLoss()
+    # loss_criterion = nn.CrossEntropyLoss()
+    loss_criterion = nn.BCELoss()
     
     # train reward function using the training data
     # training_inputs gives you a list of pairs of trajectories
@@ -105,6 +106,9 @@ def learn_reward(reward_network, optimizer, training_inputs, training_outputs, n
     for iter in range(num_iter):
         #zero out automatic differentiation from last time
         optimizer.zero_grad()
+
+        # for param in reward_net.parameters():
+        #     print(param.grad)
 
         # predict preferences
         predicted_rewards = []
@@ -133,23 +137,33 @@ def learn_reward(reward_network, optimizer, training_inputs, training_outputs, n
 
             x_rew = reward_network.predict_reward(states_x, actions_x)
             y_rew = reward_network.predict_reward(states_y, actions_y)
-            predicted_rewards.append([x_rew, y_rew])
+            # predicted_rewards.append([x_rew, y_rew])
+
+            predicted_rewards.append(torch.exp(x_rew) / (torch.exp(x_rew) + torch.exp(y_rew)))
 
         # compute loss
         # print(predicted_rewards)
-        a = torch.tensor(predicted_rewards, requires_grad=True)
-        b = torch.tensor(training_outputs)
-        loss = loss_criterion(torch.tensor(predicted_rewards, requires_grad=True), torch.tensor(training_outputs))
+        # print(predicted_rewards.size(), training_outputs.size())
+        # a = torch.stack(predicted_rewards)
+        # b = torch.tensor(training_outputs).float()
+
+        loss = loss_criterion(torch.stack(predicted_rewards), torch.tensor(training_outputs).float().to(device))
+
         print("iteration", iter, "bc loss", loss)
         
         #back propagate the error through the network to figure out how update it to prefer demonstrator actions
         loss.backward()
+        # for param in reward_net.parameters():
+        #     print(param.requires_grad, param.grad)
+
+        # raise NotImplementedError
+
         #perform update on policy parameters
         optimizer.step()
 
     # After training we save the reward function weights    
     print("check pointing")
-    torch.save(reward_network.state_dict(), checkpoint_dir)
+    # torch.save(reward_network.state_dict(), checkpoint_dir)
     print("finished training")
 
 
@@ -165,7 +179,7 @@ if __name__=="__main__":
     
     #TODO: hyper parameters that you may want to tweak or change
     num_iter = 10
-    lr = 0.1
+    lr = 0.0001
     checkpoint = "./reward.params" #where to save your reward function weights
 
     # create a reward network and optimize it using the training data.
