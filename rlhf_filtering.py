@@ -73,7 +73,10 @@ def retrieve_explicit_preferences(pref_file):
         # TODO: deal with equal preference (2)
 
         traj_pairs.append((prim_traj, sec_traj))
-        traj_labels.append(label)
+        # traj_labels.append(label)
+        #TODO thing i got these backwards b/c of loss function https://pytorch.org/docs/stable/generated/torch.nn.BCELoss.html#torch.nn.BCELoss
+        #TODO also if label is 2 we can set it as 0.5 instead
+        traj_labels.append(1-label)
 
     # Mem usage
     # process = psutil.Process()
@@ -96,7 +99,7 @@ def learn_reward(reward_network, optimizer, training_inputs, training_outputs, n
     
     #We will use a cross entropy loss for pairwise preference learning
     # loss_criterion = nn.CrossEntropyLoss()
-    loss_criterion = nn.BCELoss()
+    loss_criterion = nn.BCELoss(reduction='sum')
     
     # train reward function using the training data
     # training_inputs gives you a list of pairs of trajectories
@@ -147,9 +150,13 @@ def learn_reward(reward_network, optimizer, training_inputs, training_outputs, n
         # a = torch.stack(predicted_rewards)
         # b = torch.tensor(training_outputs).float()
 
+        # print(predicted_rewards, training_outputs)
+
         loss = loss_criterion(torch.stack(predicted_rewards), torch.tensor(training_outputs).float().to(device))
 
         print("iteration", iter, "bc loss", loss)
+
+        # raise NotImplementedError
         
         #back propagate the error through the network to figure out how update it to prefer demonstrator actions
         loss.backward()
@@ -163,7 +170,7 @@ def learn_reward(reward_network, optimizer, training_inputs, training_outputs, n
 
     # After training we save the reward function weights    
     print("check pointing")
-    # torch.save(reward_network.state_dict(), checkpoint_dir)
+    torch.save(reward_network.state_dict(), checkpoint_dir)
     print("finished training")
 
 
@@ -178,8 +185,8 @@ if __name__=="__main__":
     print(traj_labels)
     
     #TODO: hyper parameters that you may want to tweak or change
-    num_iter = 10
-    lr = 0.0001
+    num_iter = 30
+    lr = 0.00005
     checkpoint = "./reward.params" #where to save your reward function weights
 
     # create a reward network and optimize it using the training data.
@@ -192,8 +199,10 @@ if __name__=="__main__":
     import torch.optim as optim
     optimizer = optim.Adam(reward_net.parameters(),  lr=lr)
 
+    start = time.time()
     learn_reward(reward_net, optimizer, traj_pairs, traj_labels, num_iter, checkpoint)
-
+    end = time.time()
+    print("Elapsed: ", end-start, "s")
 
     #debugging printout
     #we should see higher predicted rewards for more preferred trajectories
@@ -205,8 +214,8 @@ if __name__=="__main__":
         brew = predict_traj_return(reward_net, trajB)
         print("predicted return trajA", arew)
         print("predicted return trajB", brew)
-        print("A" if arew > brew else "B")
-        if traj_labels[i] == 0:
+        print("A" if arew > brew else "B", traj_labels[i])
+        if traj_labels[i] == 1: #TODO: swapped here b/c 1 means distrib pushed on primary
             print("A should be better")
             if arew > brew:
                 num_correct += 1
@@ -216,4 +225,4 @@ if __name__=="__main__":
                 num_correct += 1
 
     print(f'Correct: {num_correct}/{len(traj_pairs)}')
-
+    print(traj_labels)
