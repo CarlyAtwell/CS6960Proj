@@ -2,8 +2,12 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions.categorical import Categorical
+from torchvision.transforms.functional import pil_to_tensor
 from torch.optim import Adam
 import numpy as np
+
+from gui.filters import FILTERS
+
 
 
 def mlp(sizes, activation=nn.Tanh, output_activation=nn.Identity):
@@ -38,7 +42,7 @@ class Net(nn.Module):
         self.pool = nn.MaxPool2d(2, 2)
         self.conv2 = nn.Conv2d(6, 18, 5)
         self.conv3 = nn.Conv2d(18, 32, 5)
-        self.fc1 = nn.Linear(32 * IMAGE_DIM, 120)
+        self.fc1 = nn.Linear(IMAGE_DIM, 120)
         self.fc2 = nn.Linear(120, 84)
         self.fc3 = nn.Linear(84, FILTER_DIM)
 
@@ -50,15 +54,18 @@ class Net(nn.Module):
 
         cumulative_reward = 0
         for img_state, action in traj:
-            #this method performs a forward pass through the network
-            x = self.pool(F.relu(self.conv1(img_state)))
+            # convert pil image to tensor
+            img_tensor = pil_to_tensor(img_state)
+
+            # performs a forward pass through the network
+            x = self.pool(F.relu(self.conv1(img_tensor)))
             x = self.pool(F.relu(self.conv2(x)))
             x = self.pool(F.relu(self.conv3(x)))
             x = torch.flatten(x, 1) # flatten all dimensions except batch
             x = F.relu(self.fc1(x))
             x = F.relu(self.fc2(x))
             x = self.fc3(x)
-            cumulative_reward += x[action]
+            cumulative_reward += x[list(FILTERS).index(action)]
 
         return cumulative_reward
 

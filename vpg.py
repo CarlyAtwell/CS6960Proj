@@ -2,16 +2,13 @@ import torch
 import torch.nn as nn
 from torch.distributions.categorical import Categorical
 from torch.optim import Adam
+from torchvision.transforms.functional import pil_to_tensor
 import numpy as np
 from utils import mlp, Net
 import os
+from gui.filters import apply_filter, FILTERS
 
 ### Trains an RL policy on learned reward function
-
-### TODO: need to implement apply_filter function
-
-def apply_filter(img, filter):
-    return None
 
 
 def reward_to_go(rews):
@@ -22,7 +19,7 @@ def reward_to_go(rews):
     return rtgs
 
 
-#function to train a vanilla policy gradient agent. 
+# function to train a vanilla policy gradient agent. 
 # Altered from Cartpole domain to image filtering domain
 def train(hidden_sizes=[32], lr=1e-2, epochs=50, batch_size=5000, reward=None, checkpoint = False, checkpoint_dir = "\."):
 
@@ -36,8 +33,9 @@ def train(hidden_sizes=[32], lr=1e-2, epochs=50, batch_size=5000, reward=None, c
 
     # make function to compute action distribution
     def get_policy(img):
-        logits = logits_net(img)
-        # TODO: what is Categorical doing/returning?
+        # convert img to tensor
+        img_tensor = pil_to_tensor(img)
+        logits = logits_net(img_tensor)
         return Categorical(logits=logits)
 
     # make action/filter selection function (outputs int actions, sampled from policy)
@@ -52,7 +50,7 @@ def train(hidden_sizes=[32], lr=1e-2, epochs=50, batch_size=5000, reward=None, c
     # make optimizer
     optimizer = Adam(logits_net.parameters(), lr=lr)
 
-    # for training policy TODO: update to not be cartpole based
+    # for training policy
     def train_one_epoch():
         # make some empty lists for logging.
         batch_imgs = []         # for images
@@ -76,10 +74,11 @@ def train(hidden_sizes=[32], lr=1e-2, epochs=50, batch_size=5000, reward=None, c
             act = get_action(torch.as_tensor(img, dtype=torch.float32))
             
             # put image and selected action in tuple as single step trajectory for predict_reward func
-            img_act_pair = (img, act)
+            img_act_pair = [(img, act)]
             
             # predict reward from neural net with reward params trained from pref data
             device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+            ##### low-key not exactly sure what this is doing/ if we actually need it? ###
             torchified_state = torch.from_numpy(img_act_pair).float().to(device)
             r = reward.predict_reward(torchified_state.unsqueeze(0)).item()
             rew = r
@@ -87,8 +86,9 @@ def train(hidden_sizes=[32], lr=1e-2, epochs=50, batch_size=5000, reward=None, c
             # now apply filter/action to image
             # saying action index 8 is STOP action, but maybe 0 makes more sense, idk?
             if(act != 8):
-                # TODO: implement apply_filter function which will return the filtered image
-                img = apply_filter(img, act)
+                # apply_filter function will return the filtered image
+                filter = list(FILTERS)[act] # get filter name using action index
+                img = apply_filter(img, filter)
 
             # save action, reward
             batch_acts.append(act)
