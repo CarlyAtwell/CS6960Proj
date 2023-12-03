@@ -6,10 +6,11 @@ from torchvision.transforms.functional import pil_to_tensor
 import numpy as np
 from utils import mlp, Net
 import os
+from os import listdir
+from os.path import isfile, join
 from gui.filters import apply_filter, FILTERS
 
 ### Trains an RL policy on learned reward function
-
 
 def reward_to_go(rews):
     n = len(rews)
@@ -21,12 +22,17 @@ def reward_to_go(rews):
 
 # function to train a vanilla policy gradient agent. 
 # Altered from Cartpole domain to image filtering domain
-def train(hidden_sizes=[32], lr=1e-2, epochs=50, batch_size=5000, reward=None, checkpoint = False, checkpoint_dir = "\."):
+def train(hidden_sizes=[32], lr=1e-2, epochs=50, batch_size=100, reward=None, checkpoint = False, checkpoint_dir = "\."):
 
     # input dim for policy neural net: size of images
     img_dim = 1024 * 1024
     # num of actions: # of filter choices + stop action
     num_acts = 9
+
+    # get training images
+    TRAIN_DIR = './datasets/train/'
+    TRAIN_IMGS =  [img_file for img_file in listdir(TRAIN_DIR) if isfile(join(dir, img_file)) and img_file.endswith(('.png', '.jpg', '.jpeg', '.tiff', '.bmp', '.gif'))]
+    next_img = 0
 
     # make core of policy network
     logits_net = mlp(sizes=[img_dim]+hidden_sizes+[num_acts])
@@ -46,12 +52,13 @@ def train(hidden_sizes=[32], lr=1e-2, epochs=50, batch_size=5000, reward=None, c
     def compute_loss(img, act, weights):
         logp = get_policy(img).log_prob(act)
         return -(logp * weights).mean()
+    
 
     # make optimizer
     optimizer = Adam(logits_net.parameters(), lr=lr)
 
     # for training policy
-    def train_one_epoch():
+    def train_one_epoch(next_img):
         # make some empty lists for logging.
         batch_imgs = []         # for images
         batch_acts = []         # for actions
@@ -60,9 +67,9 @@ def train(hidden_sizes=[32], lr=1e-2, epochs=50, batch_size=5000, reward=None, c
         batch_lens = []         # for measuring episode lengths
 
         # reset episode-specific variables
-        img = None               # TODO: first img comes from ? sample from some set of training images?
-        done = False            # TODO: when STOP action is chosen instead of a filter to signal that episode is over
-        ep_rews = []            # list for rewards accrued throughout ep
+        img = TRAIN_IMGS[next_img]       # first img for this epoch comes from set of training images
+        next_img += 1
+        ep_rews = []                    # list for rewards accrued throughout ep
 
         # collect experience by applying filter actions to training images with current policy
         while True:
@@ -103,8 +110,11 @@ def train(hidden_sizes=[32], lr=1e-2, epochs=50, batch_size=5000, reward=None, c
                 # the weight for each logprob(a_t|s_t) is reward-to-go from t
                 batch_weights += list(reward_to_go(ep_rews))
 
-                # reset episode-specific variables ################################## TODO: set image to next img from training set/folder, not None
-                img, done, ep_rews = None, False, []
+                # reset image-specific variables 
+                # set image to next img from training set/folder
+                img = TRAIN_IMGS[next_img]
+                next_img += 1
+                done, ep_rews = False, []
 
                 # end this batch loop if we have enough of it
                 if len(batch_imgs) > batch_size:
@@ -122,7 +132,8 @@ def train(hidden_sizes=[32], lr=1e-2, epochs=50, batch_size=5000, reward=None, c
 
     # training loop
     for i in range(epochs):
-        batch_loss, batch_rets, batch_lens = train_one_epoch()
+        batch_loss, batch_rets, batch_lens = train_one_epoch(next_img)
+        next_img += batch_size # for starting index of next batch of training images
         print('epoch: %3d \t loss: %.3f \t predicted return: %.3f \t ep_len (gt reward): %.3f'%
                 (i, batch_loss, np.mean(batch_rets), np.mean(batch_lens)))
         
@@ -142,6 +153,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--lr', type=float, default=1e-2)
     parser.add_argument('--epochs', type=int, default=10)
+    parser.add_argument('--batch_size', type=int, default=20)
     parser.add_argument('--checkpoint', action='store_true')
     parser.add_argument('--checkpoint_dir', type=str, default='\.')
     parser.add_argument('--reward_params', type=str, default='', help="parameters of learned reward function")
@@ -159,5 +171,5 @@ if __name__ == '__main__':
     reward_net = Net()
     reward_net.load_state_dict(torch.load(args.reward_params))
     reward_net.to(device)
-    train(lr=args.lr, epochs=args.epochs, reward=reward_net, 
+    train(lr=args.lr, epochs=args.epochs, batch_size=args.batch_size, reward=reward_net, 
           checkpoint=args.checkpoint, checkpoint_dir=args.checkpoint_dir)
