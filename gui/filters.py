@@ -48,6 +48,20 @@ FILTER_OPPOSITES = {
     'sharpness-': 'sharpness+'
 }
 
+# Maps int to the correct filter
+FILTER_MAPPING = ['bright+10', 'bright-10', 'color_bal+', 'color_bal-', 'contrast+10', 'contrast-10', 'sharpness+', 'sharpness-', 'none']
+FILTER_REVERSE_MAPPING = {
+    'bright+10': 0,
+    'bright-10': 1,
+    'color_bal+': 2,
+    'color_bal-': 3,
+    'contrast+10': 4,
+    'contrast-10': 5,
+    'sharpness+': 6,
+    'sharpness-': 7,
+    'none': 8
+}
+
 
 def apply_filter_chain(img, filters):
     '''
