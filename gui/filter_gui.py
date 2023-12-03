@@ -10,7 +10,7 @@ import os
 import json
 
 # Modules
-from filters import FILTERS
+from filters import FILTERS, FILTER_OPPOSITES
 
 #### GUI HELPERS ###########################################################
 def set_size(element, size):
@@ -192,6 +192,13 @@ class FilterHistory:
         if self.ind == -1:
             return self.base_img
         return self.images[self.ind]
+    
+    def get_cur_filt(self):
+        '''
+        Returns last applied filter
+        '''
+
+        return 'none' if self.ind < 0 else self.filters[self.ind]
     
     def get_filts(self):
         '''
@@ -407,8 +414,12 @@ class GUI:
                 # Apply filter, update history
                 cur_hist = self.filt_hist[self.cur_img_ind]
 
+                # If we are just doing the opposite of the last filter, just undo the last instead
+                if FILTER_OPPOSITES[key] == cur_hist.get_cur_filt():
+                    cur_hist.undo()
+                    self.load_img()
                 # Don't apply if more than max allowed
-                if cur_hist.get_num_active() < MAX_FILTER_APPLICATIONS:
+                elif cur_hist.get_num_active() < MAX_FILTER_APPLICATIONS:
                     cur_hist.apply(key)
 
                     self.load_img()
