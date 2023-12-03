@@ -36,6 +36,18 @@ FILTERS = {
     #TODO: channel mixing
 }
 
+# So if they do the opposite filter we just undo instead of stacking to avoid garbage data
+FILTER_OPPOSITES = {
+    'bright+10': 'bright-10',
+    'bright-10': 'bright+10',
+    'color_bal+': 'color_bal-',
+    'color_bal-': 'color_bal+',
+    'contrast+10': 'contrast-10',
+    'contrast-10': 'contrast+10',
+    'sharpness+': 'sharpness-',
+    'sharpness-': 'sharpness+'
+}
+
 
 def apply_filter_chain(img, filters):
     '''
