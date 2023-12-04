@@ -9,7 +9,7 @@ import json
 from PIL import Image
 import torchvision.transforms as transforms 
 
-from config import PREF_FILE
+from config import PREF_FILE, CHECKPOINT_FILE, EVAL_FILE
 from gui.filters import apply_filter, FILTER_REVERSE_MAPPING
 
 # import psutil
@@ -43,47 +43,89 @@ def retrieve_explicit_preferences(pref_file):
         
         img_dir = base_dir + '/' + img_name
         
-        base_img = Image.open(img_dir)
+        # base_img = Image.open(img_dir)
 
-        prim_traj = []
-        prim_state = base_img
-        for action_str in prim_filts:
-            action = FILTER_REVERSE_MAPPING[action_str]
-            # Append transition from current state with given action (filter)
-            prim_traj.append((pil_transform(prim_state).unsqueeze(0), action))
+        # prim_traj = []
+        # prim_state = base_img
+        # for action_str in prim_filts:
+        #     action = FILTER_REVERSE_MAPPING[action_str]
+        #     # Append transition from current state with given action (filter)
+        #     prim_traj.append((pil_transform(prim_state).unsqueeze(0), action))
 
-            # Do transition
-            prim_state = apply_filter(prim_state, action_str)
-        # Apply 'none' (stop) action to end of trajectories
-        prim_traj.append((pil_transform(prim_state).unsqueeze(0), FILTER_REVERSE_MAPPING['none']))
+        #     # Do transition
+        #     prim_state = apply_filter(prim_state, action_str)
+        # # Apply 'none' (stop) action to end of trajectories
+        # prim_traj.append((pil_transform(prim_state).unsqueeze(0), FILTER_REVERSE_MAPPING['none']))
         
-        sec_traj = []
-        sec_state = base_img
-        for action_str in sec_filts:
-            action = FILTER_REVERSE_MAPPING[action_str]
-            # Append transition from current state with given action (filter)
-            sec_traj.append((pil_transform(sec_state).unsqueeze(0), action))
+        # sec_traj = []
+        # sec_state = base_img
+        # for action_str in sec_filts:
+        #     action = FILTER_REVERSE_MAPPING[action_str]
+        #     # Append transition from current state with given action (filter)
+        #     sec_traj.append((pil_transform(sec_state).unsqueeze(0), action))
 
-            # Do transition
-            sec_state = apply_filter(sec_state, action_str)
-        # Apply 'none' (stop) action to end of trajectories
-        sec_traj.append((pil_transform(sec_state).unsqueeze(0), FILTER_REVERSE_MAPPING['none']))
+        #     # Do transition
+        #     sec_state = apply_filter(sec_state, action_str)
+        # # Apply 'none' (stop) action to end of trajectories
+        # sec_traj.append((pil_transform(sec_state).unsqueeze(0), FILTER_REVERSE_MAPPING['none']))
 
-        # Append the pair of (s,a) trajectories to the pairs with the corresponding preference label between primary/secondary
-        # TODO: deal with equal preference (2)
+        # # Append the pair of (s,a) trajectories to the pairs with the corresponding preference label between primary/secondary
+        # # TODO: deal with equal preference (2)
 
-        traj_pairs.append((prim_traj, sec_traj))
+        # traj_pairs.append((prim_traj, sec_traj))
+
+        traj_pairs.append((img_dir, prim_filts, sec_filts))
+
         # traj_labels.append(label)
         #TODO thing i got these backwards b/c of loss function https://pytorch.org/docs/stable/generated/torch.nn.BCELoss.html#torch.nn.BCELoss
-        #TODO also if label is 2 we can set it as 0.5 instead
-        traj_labels.append(1-label)
+        # If label is 2 we can set it as 0.5 instead
+        if label == 2:
+            traj_labels.append(0.5)
+        else:
+            traj_labels.append(1-label)
 
     # Mem usage
     # process = psutil.Process()
     # print(f'Mem Usage:  {process.memory_info().vms / (1024 ** 3)} GB    {process.memory_info().vms / (1024 ** 2)} MB    {process.memory_info().vms} B')
     print("Extracted explicit prefs from file:", pref_file)
+    print(traj_labels)
 
     return traj_pairs, traj_labels
+
+
+def gen_pref_traj(pref):
+    pil_transform = transforms.Compose([transforms.ToTensor()]) # Use this instead of PILToTensor b/c PILToTensor doesn't normalize to [0,1] float
+
+    img_dir, prim_filts, sec_filts = pref
+    
+    base_img = Image.open(img_dir)
+
+    prim_traj = []
+    prim_state = base_img
+    for action_str in prim_filts:
+        action = FILTER_REVERSE_MAPPING[action_str]
+        # Append transition from current state with given action (filter)
+        prim_traj.append((pil_transform(prim_state).unsqueeze(0), action))
+
+        # Do transition
+        prim_state = apply_filter(prim_state, action_str)
+    # Apply 'none' (stop) action to end of trajectories
+    prim_traj.append((pil_transform(prim_state).unsqueeze(0), FILTER_REVERSE_MAPPING['none']))
+    
+    sec_traj = []
+    sec_state = base_img
+    for action_str in sec_filts:
+        action = FILTER_REVERSE_MAPPING[action_str]
+        # Append transition from current state with given action (filter)
+        sec_traj.append((pil_transform(sec_state).unsqueeze(0), action))
+
+        # Do transition
+        sec_state = apply_filter(sec_state, action_str)
+    # Apply 'none' (stop) action to end of trajectories
+    sec_traj.append((pil_transform(sec_state).unsqueeze(0), FILTER_REVERSE_MAPPING['none']))
+
+    return (prim_traj, sec_traj)
+    
 
 def predict_traj_return(net, traj):
     states = [e[0].to(device) for e in traj]
@@ -106,7 +148,15 @@ def learn_reward(reward_network, optimizer, training_inputs, training_outputs, n
     # training_outputs gives you a list of labels (0 if first trajectory better, 1 if second is better)
     
 
+    
+
     for iter in range(num_iter):
+        
+        # Do 5 random so don't run out of mem
+        sample_inds = random.sample(range(len(training_inputs)), 5)
+        input_sample = [training_inputs[si] for si in sample_inds]
+        output_sample = [training_outputs[si] for si in sample_inds]
+
         #zero out automatic differentiation from last time
         optimizer.zero_grad()
 
@@ -116,7 +166,12 @@ def learn_reward(reward_network, optimizer, training_inputs, training_outputs, n
         # predict preferences
         predicted_rewards = []
         i = 0
-        for (x,y) in training_inputs:
+        # (traj_prim, traj_sec)
+        # each traj: [(img_state, action_int),..]
+        #for (x,y) in training_inputs:
+        #for pref in training_inputs:
+        for pref in input_sample:
+            x, y = gen_pref_traj(pref)
 
             #TODO: send to device earlier? is this slow?
             states_x = [e[0].to(device) for e in x]
@@ -153,7 +208,8 @@ def learn_reward(reward_network, optimizer, training_inputs, training_outputs, n
 
         # print(predicted_rewards, training_outputs)
 
-        loss = loss_criterion(torch.stack(predicted_rewards), torch.tensor(training_outputs).float().to(device))
+        #loss = loss_criterion(torch.stack(predicted_rewards), torch.tensor(training_outputs).float().to(device))
+        loss = loss_criterion(torch.stack(predicted_rewards), torch.tensor(output_sample).float().to(device))
 
         print("iteration", iter, "bc loss", loss)
 
@@ -186,9 +242,10 @@ if __name__=="__main__":
     print(traj_labels)
     
     #TODO: hyper parameters that you may want to tweak or change
-    num_iter = 30
+    num_iter = 150
     lr = 0.00005
-    checkpoint = "./reward.params" #where to save your reward function weights
+    #checkpoint = "./reward.params" #where to save your reward function weights
+    checkpoint = CHECKPOINT_FILE
 
     # create a reward network and optimize it using the training data.
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -209,21 +266,28 @@ if __name__=="__main__":
     #we should see higher predicted rewards for more preferred trajectories
     print("performance on training data")
     num_correct = 0
-    for i,pair in enumerate(traj_pairs):
-        trajA, trajB = pair
-        arew = predict_traj_return(reward_net, trajA)
-        brew = predict_traj_return(reward_net, trajB)
-        print("predicted return trajA", arew)
-        print("predicted return trajB", brew)
-        print("A" if arew > brew else "B", traj_labels[i])
-        if traj_labels[i] == 1: #TODO: swapped here b/c 1 means distrib pushed on primary
-            print("A should be better")
-            if arew > brew:
-                num_correct += 1
-        else:
-            print("B should be better")
-            if brew > arew:
-                num_correct += 1
+    with open(EVAL_FILE, "w") as f:
+        for i,pref in enumerate(traj_pairs):
+            trajA, trajB = gen_pref_traj(pref)
 
-    print(f'Correct: {num_correct}/{len(traj_pairs)}')
-    print(traj_labels)
+            arew = predict_traj_return(reward_net, trajA)
+            brew = predict_traj_return(reward_net, trajB)
+            f.write(f"predicted return trajA {arew}\n")
+            f.write(f"predicted return trajB {brew}\n")
+            f.write("A " if arew > brew else "B ")
+            f.write(f"{traj_labels[i]}\n")
+            if traj_labels[i] == 1: #TODO: swapped here b/c 1 means distrib pushed on primary
+                f.write("A should be better\n")
+                if arew > brew:
+                    num_correct += 1
+            else:
+                f.write("B should be better\n")
+                if brew > arew:
+                    num_correct += 1
+
+            del trajA
+            del trajB
+
+        f.write(f'Correct: {num_correct}/{len(traj_pairs)}\n')
+        print(f'Correct: {num_correct}/{len(traj_pairs)}')
+        print(traj_labels)
