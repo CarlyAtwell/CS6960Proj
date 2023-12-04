@@ -153,9 +153,12 @@ def learn_reward(reward_network, optimizer, training_inputs, training_outputs, n
     for iter in range(num_iter):
         
         # Do 5 random so don't run out of mem
-        sample_inds = random.sample(range(len(training_inputs)), 5)
+        sample_inds = random.sample(range(len(training_inputs)), 10)
         input_sample = [training_inputs[si] for si in sample_inds]
         output_sample = [training_outputs[si] for si in sample_inds]
+
+        # input_sample = training_inputs
+        # output_sample = training_outputs
 
         #zero out automatic differentiation from last time
         optimizer.zero_grad()
@@ -200,6 +203,12 @@ def learn_reward(reward_network, optimizer, training_inputs, training_outputs, n
 
             predicted_rewards.append(torch.exp(x_rew) / (torch.exp(x_rew) + torch.exp(y_rew)))
 
+            # Try to clear memory idk
+            # del x
+            # del y
+            # torch.cuda.empty_cache()
+            # print(torch.cuda.memory_allocated())
+
         # compute loss
         # print(predicted_rewards)
         # print(predicted_rewards.size(), training_outputs.size())
@@ -212,6 +221,7 @@ def learn_reward(reward_network, optimizer, training_inputs, training_outputs, n
         loss = loss_criterion(torch.stack(predicted_rewards), torch.tensor(output_sample).float().to(device))
 
         print("iteration", iter, "bc loss", loss)
+        print(torch.cuda.memory_allocated())
 
         # raise NotImplementedError
         
@@ -242,8 +252,8 @@ if __name__=="__main__":
     print(traj_labels)
     
     #TODO: hyper parameters that you may want to tweak or change
-    num_iter = 150
-    lr = 0.00005
+    num_iter = 150 #300 0.000001; same for 150 I think; 50 was lower 0.0000001
+    lr = 0.0001
     #checkpoint = "./reward.params" #where to save your reward function weights
     checkpoint = CHECKPOINT_FILE
 
