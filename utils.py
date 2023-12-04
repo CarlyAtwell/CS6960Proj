@@ -13,9 +13,19 @@ from gui.filters import FILTERS
 def mlp(sizes, activation=nn.Tanh, output_activation=nn.Identity):
     # Conv neural network for the policy
 
-    layers = [nn.Conv2d(3, 6, 5), activation, nn.MaxPool2d(2, 2), 
-              nn.Conv2d(6, 18, 5), activation, nn.MaxPool2d(2, 2), 
-              nn.Conv2d(18, 32, 5), activation, nn.MaxPool2d(2, 2), nn.Flatten()]
+    # print('mlp', sizes)
+
+    layers = [nn.Conv2d(3, 6, 5, padding='same', padding_mode='replicate'),
+              activation(), 
+              nn.MaxPool2d(2, 2), 
+              nn.Conv2d(6, 18, 5, padding='same', padding_mode='replicate'), 
+              activation(), 
+              nn.MaxPool2d(2, 2), 
+              nn.Conv2d(18, 32, 5, padding='same', padding_mode='replicate'), 
+              activation(), 
+              nn.MaxPool2d(2, 2), 
+              nn.Flatten()]
+    
     for j in range(len(sizes)-1):
         act = activation if j < len(sizes)-2 else output_activation
         layers += [nn.Linear(sizes[j], sizes[j+1]), act()]

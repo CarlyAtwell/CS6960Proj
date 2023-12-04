@@ -19,7 +19,7 @@ def retrieve_explicit_preferences(pref_file):
     Retrieves explicit preferences from a user using the preference_gui.py to generate a file
     '''
 
-    pil_transform = transforms.Compose([transforms.ToTensor()])
+    pil_transform = transforms.Compose([transforms.ToTensor()]) # Use this instead of PILToTensor b/c PILToTensor doesn't normalize to [0,1] float
 
     base_dir = None
     primary_dir = None
@@ -118,6 +118,7 @@ def learn_reward(reward_network, optimizer, training_inputs, training_outputs, n
         i = 0
         for (x,y) in training_inputs:
 
+            #TODO: send to device earlier? is this slow?
             states_x = [e[0].to(device) for e in x]
             actions_x = [e[1] for e in x]
             states_y = [e[0].to(device) for e in y]
