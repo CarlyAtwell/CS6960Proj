@@ -11,6 +11,7 @@ from os.path import isfile, join
 from gui.filters import apply_filter, FILTERS, FILTER_MAPPING
 import torchvision.transforms as transforms 
 from PIL import Image
+import random
 
 ### Trains an RL policy on learned reward function
 
@@ -24,7 +25,7 @@ def reward_to_go(rews):
 
 # function to train a vanilla policy gradient agent. 
 # Altered from Cartpole domain to image filtering domain
-def train(hidden_sizes=[32], lr=1e-2, epochs=50, batch_size=100, reward=None, checkpoint = False, checkpoint_dir = "\."):
+def train(hidden_sizes=[32], lr=1e-2, epochs=50, batch_size=25, reward=None, checkpoint = False, checkpoint_dir = "\."):
 
     # input dim for policy neural net: size of images
     img_dim = 1024 * 1024
@@ -32,7 +33,7 @@ def train(hidden_sizes=[32], lr=1e-2, epochs=50, batch_size=100, reward=None, ch
     num_acts = 9
 
     # Max actions to take before just injecting a stop command
-    MAX_ACTS = 12
+    MAX_ACTS = 10
 
     # get training images
     TRAIN_DIR = './datasets/train'
@@ -65,7 +66,14 @@ def train(hidden_sizes=[32], lr=1e-2, epochs=50, batch_size=100, reward=None, ch
     optimizer = Adam(logits_net.parameters(), lr=lr)
 
     # for training policy
-    def train_one_epoch(next_img):
+    def train_one_epoch():
+        
+        # Sample batch_size random images from the TRAIN_IMGS
+        # TODO: is this good? or should our batches just go thru the entire dataset and then loop around..?
+        curr_img = 0
+        batch_files = random.sample(TRAIN_IMGS, batch_size)
+
+
         # make some empty lists for logging.
         batch_imgs = []         # for images
         batch_acts = []         # for actions
@@ -77,13 +85,14 @@ def train(hidden_sizes=[32], lr=1e-2, epochs=50, batch_size=100, reward=None, ch
 
         # reset episode-specific variables
         pil_transform = transforms.Compose([transforms.ToTensor()]) # Use this instead of PILToTensor b/c PILToTensor doesn't normalize to [0,1] float
-        img_file = TRAIN_IMGS[next_img]       # first img for this epoch comes from set of training images
+        #img_file = TRAIN_IMGS[next_img]       # first img for this epoch comes from set of training images
+        img_file = batch_files[curr_img]       # first img for this epoch comes from set of training images
         img_pil = Image.open(TRAIN_DIR + '/' + img_file) #pil_transform(Image.open(TRAIN_DIR + '/' + img_file)).unsqueeze(0).to(device) #TODO: need to do unsqeeze(0)? and to(device) ?
         img_tensor = pil_transform(img_pil).unsqueeze(0).to(device)
-        next_img += 1
         ep_rews = []                    # list for rewards accrued throughout ep
 
         episode_acts = 0
+        imgs_filtered = 0
 
         # collect experience by applying filter actions to training images with current policy
         while True:
@@ -142,19 +151,27 @@ def train(hidden_sizes=[32], lr=1e-2, epochs=50, batch_size=100, reward=None, ch
 
                 # reset image-specific variables 
                 # set image to next img from training set/folder
-                img_file = TRAIN_IMGS[next_img]
+                #img_file = TRAIN_IMGS[next_img]
+
+
+                # Next image
+                curr_img += 1
+                # end this batch loop if we have enough of it
+                #if len(batch_imgs) > batch_size:
+                if curr_img >= batch_size:
+                    break
+
+                img_file = batch_files[curr_img]
                 img_pil = Image.open(TRAIN_DIR + '/' + img_file) #pil_transform(Image.open(TRAIN_DIR + '/' + img_file)).unsqueeze(0).to(device) #TODO: need to do unsqeeze(0)? and to(device) ?
                 img_tensor = pil_transform(img_pil).unsqueeze(0).to(device)
-                next_img += 1
                 done, ep_rews = False, []
 
                 episode_acts = 0
 
-                # print("FIN", len(batch_imgs))
+                imgs_filtered += 1
+                # print("FIN", len(batch_imgs), imgs_filtered)
 
-                # end this batch loop if we have enough of it
-                if len(batch_imgs) > batch_size:
-                    break
+
 
         # take a single policy gradient update step
         optimizer.zero_grad()
@@ -170,17 +187,16 @@ def train(hidden_sizes=[32], lr=1e-2, epochs=50, batch_size=100, reward=None, ch
         batch_loss.backward()
         optimizer.step()
 
-        return batch_loss, batch_rets, batch_lens, next_img
+        return batch_loss, batch_rets, batch_lens
 
     # training loop
     for i in range(epochs):
         print(next_img_batch)
-        batch_loss, batch_rets, batch_lens, next_img = train_one_epoch(next_img_batch)
-        next_img_batch = next_img
+        batch_loss, batch_rets, batch_lens = train_one_epoch()
         #TODO: don't think this is necessary b/c already advancing the images
         #TODO: need to account for if go over total number of training images
         #TODO: maybe random sample from the 5000 images for a batch, filter everything in that batch to completion in each epoch, rather than this thing where batch depends on number of applied filters
-        #next_img += batch_size # for starting index of next batch of training images
+        next_img_batch += batch_size
         print('epoch: %3d \t loss: %.3f \t predicted return: %.3f \t ep_len (gt reward): %.3f'%
                 (i, batch_loss, np.mean(batch_rets), np.mean(batch_lens)))
         
@@ -200,7 +216,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--lr', type=float, default=1e-2)
     parser.add_argument('--epochs', type=int, default=10)
-    parser.add_argument('--batch_size', type=int, default=20)
+    #parser.add_argument('--batch_size', type=int, default=20)
+    parser.add_argument('--batch_size', type=int, default=5) #NOTE: if this is too high then we run out of GPU memory so keep it small
     parser.add_argument('--checkpoint', action='store_true')
     parser.add_argument('--checkpoint_dir', type=str, default='\.')
     parser.add_argument('--reward_params', type=str, default='', help="parameters of learned reward function")

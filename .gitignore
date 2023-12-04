@@ -1,3 +1,4 @@
 ./gui/__pycache__
 reward.params
-./rlhf
+rlhf
+__pycache__
