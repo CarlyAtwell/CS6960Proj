@@ -7,10 +7,14 @@ import random
 from utils import mlp, Net
 import json
 from PIL import Image
-import torchvision.transforms as transforms 
+import torchvision.transforms as transforms
 
-from config import PREF_FILE, CHECKPOINT_FILE, EVAL_FILE
+import matplotlib.pyplot as pyplot
+import os
+
+from config import PREF_FILE, OUT_DIR
 from gui.filters import apply_filter, FILTER_REVERSE_MAPPING
+from tuned_alexnet import TunedAlexNet
 
 # import psutil
 
@@ -146,16 +150,18 @@ def learn_reward(reward_network, optimizer, training_inputs, training_outputs, n
     # train reward function using the training data
     # training_inputs gives you a list of pairs of trajectories
     # training_outputs gives you a list of labels (0 if first trajectory better, 1 if second is better)
-    
 
-    
+    loss_history = []
 
     for iter in range(num_iter):
         
         # Do 5 random so don't run out of mem
-        sample_inds = random.sample(range(len(training_inputs)), 10)
-        input_sample = [training_inputs[si] for si in sample_inds]
-        output_sample = [training_outputs[si] for si in sample_inds]
+        #NOTE: with the fine tuned alexnet I can fit the whole thing now on GPU, but if problems can uncomment the three lines to do sampling
+        #sample_inds = random.sample(range(len(training_inputs)), 100)
+        #input_sample = [training_inputs[si] for si in sample_inds]
+        #output_sample = [training_outputs[si] for si in sample_inds]
+        input_sample = training_inputs
+        output_sample = training_outputs
 
         # input_sample = training_inputs
         # output_sample = training_outputs
@@ -169,6 +175,7 @@ def learn_reward(reward_network, optimizer, training_inputs, training_outputs, n
         # predict preferences
         predicted_rewards = []
         i = 0
+
         # (traj_prim, traj_sec)
         # each traj: [(img_state, action_int),..]
         #for (x,y) in training_inputs:
@@ -235,16 +242,47 @@ def learn_reward(reward_network, optimizer, training_inputs, training_outputs, n
         #perform update on policy parameters
         optimizer.step()
 
+        loss_history.append(float(loss))
+
     # After training we save the reward function weights    
     print("check pointing")
     torch.save(reward_network.state_dict(), checkpoint_dir)
     print("finished training")
 
+    return loss_history
 
 
+def plot_loss_history(loss_hist):
+    '''
+    Plots the loss history
+    '''
+    ep = range(len(loss_hist))
+
+    fig, ax = pyplot.subplots(figsize=(14, 10))
+    fig.set_tight_layout(True) # Sets nice padding between subplots
+
+    ax.plot(ep, loss_hist, '-b', label = 'training')
+    #ax.plot(ep, self.validation_loss_history, '-r', label = 'validation')
+    ax.set_title("Loss history")
+    #ax.legend()
+    ax.set_ylabel("Loss")
+    ax.set_xlabel("Epochs")
+
+    fig.savefig(f'{OUT_DIR}/loss_history.png')
+    
 
 
 if __name__=="__main__":
+
+    if not os.path.exists(OUT_DIR):
+        print(f"Creating dir '{OUT_DIR}'")
+        os.makedirs(OUT_DIR)
+
+    #checkpoint = "./reward.params" #where to save your reward function weights
+    checkpoint = f'{OUT_DIR}/rewardnet.params'
+    eval_file = f'{OUT_DIR}/eval.txt'
+
+
 
     ###### TODO: create preference data from GUI #####
     traj_pairs, traj_labels = retrieve_explicit_preferences(PREF_FILE) #TODO: alternatively generate synthetic preferences from a user's filtering for experiment 2
@@ -252,31 +290,36 @@ if __name__=="__main__":
     print(traj_labels)
     
     #TODO: hyper parameters that you may want to tweak or change
-    num_iter = 150 #300 0.000001; same for 150 I think; 50 was lower 0.0000001
-    lr = 0.0001
-    #checkpoint = "./reward.params" #where to save your reward function weights
-    checkpoint = CHECKPOINT_FILE
+    num_iter = 30 #150 #300 0.000001; same for 150 I think; 50 was lower 0.0000001
+    lr = 0.0001 #5e-4#0.0001
+    wd = 3e-3
 
     # create a reward network and optimize it using the training data.
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    reward_net = Net()
+    #reward_net = Net()
+    reward_net = TunedAlexNet()
+    print(reward_net)
     reward_net.to(device)
 
     print("Made net")
 
     import torch.optim as optim
-    optimizer = optim.Adam(reward_net.parameters(),  lr=lr)
+    optimizer = optim.Adam(reward_net.parameters(),  lr=lr)#, weight_decay=wd)
 
     start = time.time()
-    learn_reward(reward_net, optimizer, traj_pairs, traj_labels, num_iter, checkpoint)
+    loss_hist = learn_reward(reward_net, optimizer, traj_pairs, traj_labels, num_iter, checkpoint)
     end = time.time()
     print("Elapsed: ", end-start, "s")
+
+    print("Plotting...")
+    plot_loss_history(loss_hist)
+    print("Plotted")
 
     #debugging printout
     #we should see higher predicted rewards for more preferred trajectories
     print("performance on training data")
     num_correct = 0
-    with open(EVAL_FILE, "w") as f:
+    with open(eval_file, "w") as f:
         for i,pref in enumerate(traj_pairs):
             trajA, trajB = gen_pref_traj(pref)
 

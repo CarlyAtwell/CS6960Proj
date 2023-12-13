@@ -1,9 +1,10 @@
 # Current user preference file to use if doing explicit preferences (Experiment 1)
 # Generated from ./gui/preferences_gui.py
-PREF_FILE = './gui/230Pref_1newdirs.txt'
-#CHECKPOINT_FILE = './reward_checkpoints/reward_230Pref_1.params'
-CHECKPOINT_FILE = './reward_checkpoints/reward_230Pref_1_150iter0001.params'
-EVAL_FILE = './reward_checkpoints/reward_230Pref_1_150iter0001.txt'
+PREF_FILE = './gui/230Prefs_2_newdirs.txt'
+
+OUT_DIR = './reward_checkpoints/tunedalex5full'
+# CHECKPOINT_FILE = './reward_checkpoints/tunedalex/reward_230Prefs_2.params'
+# EVAL_FILE = './reward_checkpoints/tunedalex/reward_230Prefs_2.txt'
 
 # We want to not show some portion of the images so we can use them to both evaluate the reward network's fit and to use at the end after the policy generates images
 # so we can compare against which image the user liked, and if what the network spits out for that image is somewhat similar to the user preference (?)
