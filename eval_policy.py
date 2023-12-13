@@ -13,15 +13,20 @@ import torchvision.transforms as transforms
 from PIL import Image
 import json
 
+from tuned_alexnet import TunedAlexNet, TunedPolicyAlexNet
+
 # function to train a vanilla policy gradient agent. 
 # Altered from Cartpole domain to image filtering domain
 def filter_images(hidden_sizes=[32]):
 
-    POLICY_PARAMS = './rlhf/policy_checkpoint9.params'
+    #POLICY_PARAMS = './rlhf/policy_checkpoint9.params'
+    #POLICY_PARAMS = './reward_checkpoints/tunedalex4full_30iter_0001lr/rewardnet.params'
+    POLICY_PARAMS = './alex_checkpoints/policy_checkpoint29.params'
     OUTPUT_TXT = 'out.txt'
-    OUTPUT_DIR = './eval/test50'
+    #OUTPUT_DIR = './eval/test50'
+    OUTPUT_DIR = './eval/test_alexpolicy'
 
-    NUM_FILTER = 50 # how many you want to filter if loading more than that many
+    NUM_FILTER = 25#50 # how many you want to filter if loading more than that many
     IMG_DIR = './datasets/test'
     EVAL_IMGS =  [img_file for img_file in listdir(IMG_DIR) if isfile(join(IMG_DIR, img_file)) and img_file.endswith(('.png', '.jpg', '.jpeg', '.tiff', '.bmp', '.gif'))]
 
@@ -39,7 +44,11 @@ def filter_images(hidden_sizes=[32]):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     # make core of policy network
-    logits_net = mlp(sizes=[img_dim//2]+hidden_sizes+[num_acts]).to(device)
+    #TODO temp try just reward net directly
+    #logits_net = mlp(sizes=[img_dim//2]+hidden_sizes+[num_acts]).to(device)
+    #logits_net.load_state_dict(torch.load(POLICY_PARAMS))
+    #logits_net = TunedAlexNet().to(device)
+    logits_net = TunedPolicyAlexNet().to(device)
     logits_net.load_state_dict(torch.load(POLICY_PARAMS))
 
     # make function to compute action distribution

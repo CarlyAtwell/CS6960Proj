@@ -51,11 +51,6 @@ class TunedAlexNet(nn.Module):
   def forward(self, x: torch.tensor) -> torch.tensor:
     '''
     Perform the forward pass with the net
-
-    Args:
-    -   x: the input image [Dim: (N,C,H,W)]
-    Returns:
-    -   y: the output (raw scores) of the net [Dim: (N,15)]
     '''
 
     x = self.net.features(x)
@@ -80,3 +75,60 @@ class TunedAlexNet(nn.Module):
           cumulative_reward += x[0][action]
   
       return cumulative_reward
+  
+class TunedPolicyAlexNet(nn.Module):
+  def __init__(self):
+    '''
+    Init function to define the layers and loss function
+
+    Note: Use 'sum' reduction in the loss_criterion. Ready Pytorch documention
+    to understand what it means
+
+    Note: Do not forget to freeze the layers of alexnet except the last one
+
+    Download pretrained alexnet using pytorch's API (Hint: see the import
+    statements)
+    '''
+    super().__init__()
+
+    self.net = alexnet(pretrained=True)
+    FILTER_DIM = 9
+
+    # Replace the entire fully connected classifier
+    #TODO: change architecture?
+    self.net.classifier = nn.Sequential(
+        nn.Dropout(p=0.5),
+        nn.Linear(256 * 6 * 6, 4096),
+        nn.ReLU(inplace=True),
+        nn.Dropout(p=0.5),
+        nn.Linear(4096, 1024),
+        nn.ReLU(inplace=True),
+        nn.Linear(1024, FILTER_DIM),
+    )
+
+    # Disable gradient on everything but last layer to 'freeze' the pretrained portion of the model
+    for param in self.net.parameters():
+      param.requires_grad = False
+
+    # Reenable on last layer
+    for param in self.net.classifier.parameters():
+      param.requires_grad = True
+
+    # Now shove into cnn and fc layers
+    #self.loss_criterion = nn.CrossEntropyLoss(reduction='sum')
+
+    ###########################################################################
+    # Student code end
+    ###########################################################################
+
+  def forward(self, x: torch.tensor) -> torch.tensor:
+    '''
+    Perform the forward pass with the net
+    '''
+
+    x = self.net.features(x)
+    x = self.net.avgpool(x)
+    x = torch.flatten(x, 1)
+    x = self.net.classifier(x)
+
+    return x

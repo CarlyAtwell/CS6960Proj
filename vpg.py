@@ -12,6 +12,46 @@ from gui.filters import apply_filter, FILTERS, FILTER_MAPPING
 import torchvision.transforms as transforms 
 from PIL import Image
 import random
+import matplotlib.pyplot as pyplot
+import time
+
+from tuned_alexnet import TunedPolicyAlexNet, TunedAlexNet
+
+def plot_loss_history(loss_hist, checkpoint_dir):
+    '''
+    Plots the loss history
+    '''
+    ep = range(len(loss_hist))
+
+    fig, ax = pyplot.subplots(figsize=(14, 10))
+    fig.set_tight_layout(True) # Sets nice padding between subplots
+
+    ax.plot(ep, loss_hist, '-b', label = 'training')
+    #ax.plot(ep, self.validation_loss_history, '-r', label = 'validation')
+    ax.set_title("Loss history")
+    #ax.legend()
+    ax.set_ylabel("Loss")
+    ax.set_xlabel("Epochs")
+
+    fig.savefig(f'{checkpoint_dir}/loss_history.png')
+
+def plot_return_history(ret_hist, checkpoint_dir):
+    '''
+    Plots the loss history
+    '''
+    ep = range(len(ret_hist))
+
+    fig, ax = pyplot.subplots(figsize=(14, 10))
+    fig.set_tight_layout(True) # Sets nice padding between subplots
+
+    ax.plot(ep, ret_hist, '-b', label = 'training')
+    #ax.plot(ep, self.validation_loss_history, '-r', label = 'validation')
+    ax.set_title("Predicted Return History")
+    #ax.legend()
+    ax.set_ylabel("Predicted Return")
+    ax.set_xlabel("Epochs")
+
+    fig.savefig(f'{checkpoint_dir}/return_history.png')
 
 ### Trains an RL policy on learned reward function
 
@@ -43,13 +83,15 @@ def train(hidden_sizes=[32], lr=1e-2, epochs=50, batch_size=25, reward=None, che
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     # make core of policy network
-    logits_net = mlp(sizes=[img_dim//2]+hidden_sizes+[num_acts]).to(device)
+    #logits_net = mlp(sizes=[img_dim//2]+hidden_sizes+[num_acts]).to(device)
+    logits_net = TunedPolicyAlexNet().to(device)
 
     # make function to compute action distribution
     def get_policy(img):
         # convert img to tensor
         #img_tensor = pil_to_tensor(img)
         logits = logits_net(img)
+        # print(logits)
         return Categorical(logits=logits)
 
     # make action/filter selection function (outputs int actions, sampled from policy)
@@ -190,24 +232,34 @@ def train(hidden_sizes=[32], lr=1e-2, epochs=50, batch_size=25, reward=None, che
         return batch_loss, batch_rets, batch_lens
 
     # training loop
+    loss_hist = []
+    pred_ret_hist = []
     for i in range(epochs):
         print(next_img_batch)
         batch_loss, batch_rets, batch_lens = train_one_epoch()
         #TODO: don't think this is necessary b/c already advancing the images
         #TODO: need to account for if go over total number of training images
-        #TODO: maybe random sample from the 5000 images for a batch, filter everything in that batch to completion in each epoch, rather than this thing where batch depends on number of applied filters
         next_img_batch += batch_size
         print('epoch: %3d \t loss: %.3f \t predicted return: %.3f \t ep_len (gt reward): %.3f'%
                 (i, batch_loss, np.mean(batch_rets), np.mean(batch_lens)))
         
+        loss_hist.append(float(batch_loss))
+        pred_ret_hist.append(float(np.mean(batch_rets)))
+        
         if checkpoint:
-            #checkpoint after each epoch
-            print("!!!!!! checkpointing policy !!!!!!")
-            torch.save(logits_net.state_dict(), checkpoint_dir + '/policy_checkpoint'+str(i)+'.params')
+            if (i == epochs-1) or i % 5 == 0:
+                #checkpoint after each epoch
+                print("!!!!!! checkpointing policy !!!!!!")
+                torch.save(logits_net.state_dict(), checkpoint_dir + '/policy_checkpoint'+str(i)+'.params')
     
     #always at least checkpoint at end of training
     if not checkpoint:
         torch.save(logits_net.state_dict(), checkpoint_dir + '/final_policy.params')
+
+    print("Plotting...")
+    plot_loss_history(loss_hist, checkpoint_dir)
+    plot_return_history(pred_ret_hist, checkpoint_dir)
+    print("Plotted")
     
 
 if __name__ == '__main__':
@@ -217,7 +269,7 @@ if __name__ == '__main__':
     parser.add_argument('--lr', type=float, default=1e-2)
     parser.add_argument('--epochs', type=int, default=10)
     #parser.add_argument('--batch_size', type=int, default=20)
-    parser.add_argument('--batch_size', type=int, default=5) #NOTE: if this is too high then we run out of GPU memory so keep it small
+    parser.add_argument('--batch_size', type=int, default=15) #NOTE: if this is too high then we run out of GPU memory so keep it small
     parser.add_argument('--checkpoint', action='store_true')
     parser.add_argument('--checkpoint_dir', type=str, default='\.')
     parser.add_argument('--reward_params', type=str, default='', help="parameters of learned reward function")
@@ -232,9 +284,13 @@ if __name__ == '__main__':
     #pass in parameters for trained reward network and train using that
     print("training on learned reward function")
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    reward_net = Net()
+    #reward_net = Net()
+    reward_net = TunedAlexNet()
     reward_net.load_state_dict(torch.load(args.reward_params))
     reward_net.to(device)
 
+    start = time.time()
     train(lr=args.lr, epochs=args.epochs, batch_size=args.batch_size, reward=reward_net, 
           checkpoint=args.checkpoint, checkpoint_dir=args.checkpoint_dir)
+    end = time.time()
+    print("Elapsed: ", end-start, "s")
