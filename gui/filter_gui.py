@@ -22,15 +22,6 @@ def set_size(element, size):
         element.Widget.pack_propagate(0)
         element.set_size(size)
 
-# def gen_tile(event, i, curr_img):
-#     img_bytes = get_img_bytes(curr_img)
-#     return [
-#         [sg.Frame(event + str(i), layout=[
-#             [sg.Image(data=img_bytes, size=(100,100))],
-#             [sg.Button("Remove", key=f'-REMOVE-{i}')]
-#         ])]
-#     ]
-
 def gen_filter_group(group):
     name = group[0]
     filts = group[1]
@@ -61,19 +52,6 @@ WIN_PAD = 75
 THUMBNAIL_SIZE = (200,200)
 MAIN_SIZE = (800,800)
 ##########################
-
-# # (name, func_ptr, args_dict)
-# FILTERS = {
-#     'bright+10': (filters.brightness, {'val': 1.1}),
-#     'bright-10': (filters.brightness, {'val': 0.9}),
-#     'color_bal+': (filters.color_balance, {'val': 2.0}),
-#     'color_bal-': (filters.color_balance, {'val': 0.5}),
-#     'contrast+10': (filters.contrast, {'val': 1.1}),
-#     'contrast-10': (filters.contrast, {'val': 0.9}),
-#     'sharpness+': (filters.sharpness, {'val': 2.0}),
-#     'sharpness-': (filters.sharpness, {'val': 0.0})
-#     #TODO: channel mixing
-# }
 
 FILTER_GROUPS = [
     ('Brightness', ['bright-10', 'bright+10']),
@@ -106,18 +84,6 @@ next_btns = [[sg.Button("<", key="-PREV-"), sg.Text("0/0", key="-LABEL_NUM_IMG-"
 hist_btns = [[sg.Button("Undo", key="-UNDO-"), sg.Button("Redo", key="-REDO-"), sg.Text(f"0/{MAX_FILTER_APPLICATIONS}", key="-LABEL_NUM_APPS-")]]
 filt_btns = [[gen_filter_group(group)] for group in FILTER_GROUPS]
 filter_col = sg.Column((next_btns + hist_btns + filt_btns), scrollable=True, vertical_scroll_only=True, size_subsample_height=1)
-
-#TODO: figure out how to place two cols next to each other properly for layout to work
-# Two col layout
-# filt_col_alt1 = sg.Column(filt_btns[:len(filt_btns)//2])
-# filt_col_alt2 = sg.Column(filt_btns[len(filt_btns)//2:])
-# filt_col_alt = sg.Column([[filt_col_alt1, sg.HSeparator(), filt_col_alt2]])
-# hist_col = sg.Column([],
-#     scrollable=True, vertical_scroll_only=True, 
-#     # size_subsample_height=1, 
-#     size=SIZES['-SIDE-'],
-#     justification='c',
-#     key="-HIST-")
 
 # main_layout = [[main_col, filter_col, hist_col]]
 main_layout = [[main_col, filter_col]]
@@ -430,22 +396,6 @@ class GUI:
 
                 if dir:
                     self.load_folder(dir)
-                    # files = [file for file in listdir(dir) if isfile(join(dir, file)) and file.endswith(('.png', '.jpg', '.jpeg', '.tiff', '.bmp', '.gif'))]
-                    # if files.count == 0:
-                    #     continue
-
-                    # self.cur_dir = dir
-                    # self.num_dir_images = len(files)
-                    # print(f"Found {self.num_dir_images} images ('.png', '.jpg', '.jpeg', '.tiff', '.bmp', '.gif')")
-                    # # Allocate history for each file we'll be filtering
-                    # self.filt_hist = [FilterHistory(dir, file) for file in files]
-
-                    # self.cur_img_ind = 0
-                    # self.filt_hist[self.cur_img_ind].load()
-                    # self.load_img()
-
-                    # # Change label
-                    # window['-LABEL_NUM_IMG-'].update(f'{self.cur_img_ind+1}/{self.num_dir_images}')
             if event == '-EXPORT-':
                 # Only if exists
                 if self.cur_dir:
@@ -465,15 +415,6 @@ class GUI:
                             export.append(hist.get_export())
 
                         json.dump(export, f)
-
-                        # f.write(str(self.filt_hist))
-                        # f.write(str(len(self.filt_hist)))
-                        # f.write('\n')
-                        # for hist in self.filt_hist:
-                        #     f.write(str(hist))
-                        #     f.write('\n')
-                    
-                    #np.savetxt(f'{self.cur_dir}/export.npy', np.array(self.filt_hist))
 
                     # Save output images for this export
                     for hist in self.filt_hist:

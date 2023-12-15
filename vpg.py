@@ -27,9 +27,7 @@ def plot_loss_history(loss_hist, checkpoint_dir):
     fig.set_tight_layout(True) # Sets nice padding between subplots
 
     ax.plot(ep, loss_hist, '-b', label = 'training')
-    #ax.plot(ep, self.validation_loss_history, '-r', label = 'validation')
     ax.set_title("Loss history")
-    #ax.legend()
     ax.set_ylabel("Loss")
     ax.set_xlabel("Epochs")
 
@@ -45,9 +43,7 @@ def plot_return_history(ret_hist, checkpoint_dir):
     fig.set_tight_layout(True) # Sets nice padding between subplots
 
     ax.plot(ep, ret_hist, '-b', label = 'training')
-    #ax.plot(ep, self.validation_loss_history, '-r', label = 'validation')
     ax.set_title("Predicted Return History")
-    #ax.legend()
     ax.set_ylabel("Predicted Return")
     ax.set_xlabel("Epochs")
 
@@ -111,7 +107,6 @@ def train(hidden_sizes=[32], lr=1e-2, epochs=50, batch_size=25, reward=None, che
     def train_one_epoch():
         
         # Sample batch_size random images from the TRAIN_IMGS
-        # TODO: is this good? or should our batches just go thru the entire dataset and then loop around..?
         curr_img = 0
         batch_files = random.sample(TRAIN_IMGS, batch_size)
 
@@ -129,7 +124,7 @@ def train(hidden_sizes=[32], lr=1e-2, epochs=50, batch_size=25, reward=None, che
         pil_transform = transforms.Compose([transforms.ToTensor()]) # Use this instead of PILToTensor b/c PILToTensor doesn't normalize to [0,1] float
         #img_file = TRAIN_IMGS[next_img]       # first img for this epoch comes from set of training images
         img_file = batch_files[curr_img]       # first img for this epoch comes from set of training images
-        img_pil = Image.open(TRAIN_DIR + '/' + img_file) #pil_transform(Image.open(TRAIN_DIR + '/' + img_file)).unsqueeze(0).to(device) #TODO: need to do unsqeeze(0)? and to(device) ?
+        img_pil = Image.open(TRAIN_DIR + '/' + img_file)
         img_tensor = pil_transform(img_pil).unsqueeze(0).to(device)
         ep_rews = []                    # list for rewards accrued throughout ep
 
@@ -144,29 +139,20 @@ def train(hidden_sizes=[32], lr=1e-2, epochs=50, batch_size=25, reward=None, che
             batch_imgs.append(img_tensor.clone().squeeze()) # we squeeze here b/c we need to then combine batch_imgs into one batch tensor
 
             # act in the environment
-            #act = get_action(torch.as_tensor(img, dtype=torch.float32))
             act = get_action(img_tensor)
 
             act_tensor = torch.tensor(act).to(device)
 
             episode_acts += 1
             
-            # put image and selected action in tuple as single step trajectory for predict_reward func
-            # img_act_pair = [(img, act)]
-            
             # predict reward from neural net with reward params trained from pref data
             device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-            ##### low-key not exactly sure what this is doing/ if we actually need it? ###
-            # torchified_state = torch.from_numpy(img_act_pair).float().to(device)
             # Stack these so that they are a list; can probably do unsqueeze(0) instead too
             r = reward.predict_reward(torch.stack((img_tensor,)), torch.stack((act_tensor,))).item()
             rew = r
 
-            # print(act, rew, act, episode_acts, act == 8 or episode_acts >= MAX_ACTS)
-
             # save action, reward
             batch_acts.append(act)
-            #batch_acts.append(act_tensor)
             ep_rews.append(rew)
 
             # now apply filter/action to image
@@ -178,42 +164,28 @@ def train(hidden_sizes=[32], lr=1e-2, epochs=50, batch_size=25, reward=None, che
                 img_tensor = pil_transform(img_pil).unsqueeze(0).to(device)
 
             # Put a max number of applications before we cut it off so it doesn't apply filters forever in a bad case
-            #TODO: do we need to add the 'stop' action into the batch as well?
-            #if(act == 8 or episode_acts >= MAX_ACTS): #if act == 'STOP':
             else:
                 # if filtering this image is over, record info about episode
                 ep_ret, ep_len = sum(ep_rews), len(ep_rews)
                 batch_rets.append(ep_ret)
                 batch_lens.append(ep_len)
 
-                # print('len', episode_acts, ep_len)
-
                 # the weight for each logprob(a_t|s_t) is reward-to-go from t
                 batch_weights += list(reward_to_go(ep_rews))
 
-                # reset image-specific variables 
-                # set image to next img from training set/folder
-                #img_file = TRAIN_IMGS[next_img]
-
-
                 # Next image
                 curr_img += 1
-                # end this batch loop if we have enough of it
-                #if len(batch_imgs) > batch_size:
                 if curr_img >= batch_size:
                     break
 
                 img_file = batch_files[curr_img]
-                img_pil = Image.open(TRAIN_DIR + '/' + img_file) #pil_transform(Image.open(TRAIN_DIR + '/' + img_file)).unsqueeze(0).to(device) #TODO: need to do unsqeeze(0)? and to(device) ?
+                img_pil = Image.open(TRAIN_DIR + '/' + img_file)
                 img_tensor = pil_transform(img_pil).unsqueeze(0).to(device)
                 done, ep_rews = False, []
 
                 episode_acts = 0
 
                 imgs_filtered += 1
-                # print("FIN", len(batch_imgs), imgs_filtered)
-
-
 
         # take a single policy gradient update step
         optimizer.zero_grad()
@@ -237,8 +209,6 @@ def train(hidden_sizes=[32], lr=1e-2, epochs=50, batch_size=25, reward=None, che
     for i in range(epochs):
         print(next_img_batch)
         batch_loss, batch_rets, batch_lens = train_one_epoch()
-        #TODO: don't think this is necessary b/c already advancing the images
-        #TODO: need to account for if go over total number of training images
         next_img_batch += batch_size
         print('epoch: %3d \t loss: %.3f \t predicted return: %.3f \t ep_len (gt reward): %.3f'%
                 (i, batch_loss, np.mean(batch_rets), np.mean(batch_lens)))

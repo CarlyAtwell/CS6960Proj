@@ -19,24 +19,24 @@ from tuned_alexnet import TunedAlexNet, TunedPolicyAlexNet
 # Altered from Cartpole domain to image filtering domain
 def filter_images(hidden_sizes=[32]):
 
+    OUTPUT_TXT = 'out.txt'
+
     #POLICY_PARAMS = './rlhf/policy_checkpoint9.params'
     #POLICY_PARAMS = './reward_checkpoints/tunedalex4full_30iter_0001lr/rewardnet.params'
     #POLICY_PARAMS = './alex_checkpoints/policy_checkpoint29.params'
     #POLICY_PARAMS = './policy_checkpoints_implicit/policy_checkpoint29.params'\
     #POLICY_PARAMS = './reward_checkpoints/tunedalex_victorimplicit/rewardnet.params'
-    
     # POLICY_PARAMS = './policy_checkpoints_implicit_limited/policy_checkpoint29.params'
     POLICY_PARAMS = './reward_checkpoints/tunedalex_victorimplicit_limited/rewardnet.params'
-    OUTPUT_TXT = 'out.txt'
+    
     #OUTPUT_DIR = './eval/test50'
     #OUTPUT_DIR = './eval/test_alexpolicy'
     #OUTPUT_DIR = './eval/test_policy_implicit'
     #OUTPUT_DIR = './eval/test_rewarddirect_implicit'
-
     # OUTPUT_DIR = './eval/test_policy_implicit_limited'
     OUTPUT_DIR = './eval/test_rewarddirect_implicit_limited'
 
-    NUM_FILTER = 25#50 # how many you want to filter if loading more than that many
+    NUM_FILTER = 25 # how many you want to filter if loading more than that many
     IMG_DIR = './datasets/test'
     EVAL_IMGS =  [img_file for img_file in listdir(IMG_DIR) if isfile(join(IMG_DIR, img_file)) and img_file.endswith(('.png', '.jpg', '.jpeg', '.tiff', '.bmp', '.gif'))]
 
@@ -54,11 +54,11 @@ def filter_images(hidden_sizes=[32]):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
     # make core of policy network
-    #TODO temp try just reward net directly
     #logits_net = mlp(sizes=[img_dim//2]+hidden_sizes+[num_acts]).to(device)
     #logits_net.load_state_dict(torch.load(POLICY_PARAMS))
-    logits_net = TunedAlexNet().to(device)
-    #logits_net = TunedPolicyAlexNet().to(device)
+
+    logits_net = TunedAlexNet().to(device) # IF LOADING REWARD NET DIRECTLY
+    #logits_net = TunedPolicyAlexNet().to(device) # IF LOADING POLICY NET
     logits_net.load_state_dict(torch.load(POLICY_PARAMS))
 
     # make function to compute action distribution
@@ -79,7 +79,7 @@ def filter_images(hidden_sizes=[32]):
         # reset episode-specific variables
         pil_transform = transforms.Compose([transforms.ToTensor()]) # Use this instead of PILToTensor b/c PILToTensor doesn't normalize to [0,1] float
 
-        img_pil = Image.open(IMG_DIR + '/' + img_file) #pil_transform(Image.open(TRAIN_DIR + '/' + img_file)).unsqueeze(0).to(device) #TODO: need to do unsqeeze(0)? and to(device) ?
+        img_pil = Image.open(IMG_DIR + '/' + img_file)
         img_tensor = pil_transform(img_pil).unsqueeze(0).to(device)
         episode_acts = 0
         action_traj = []
