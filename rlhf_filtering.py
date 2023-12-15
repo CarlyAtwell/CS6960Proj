@@ -12,7 +12,7 @@ import torchvision.transforms as transforms
 import matplotlib.pyplot as pyplot
 import os
 
-from config import PREF_FILE, OUT_DIR
+from config import PREF_FILE, OUT_DIR, FULLSET, SAMPLE_SIZE
 from gui.filters import apply_filter, FILTER_REVERSE_MAPPING
 from tuned_alexnet import TunedAlexNet
 
@@ -157,11 +157,17 @@ def learn_reward(reward_network, optimizer, training_inputs, training_outputs, n
         
         # Do 5 random so don't run out of mem
         #NOTE: with the fine tuned alexnet I can fit the whole thing now on GPU, but if problems can uncomment the three lines to do sampling
-        #sample_inds = random.sample(range(len(training_inputs)), 100)
-        #input_sample = [training_inputs[si] for si in sample_inds]
-        #output_sample = [training_outputs[si] for si in sample_inds]
-        input_sample = training_inputs
-        output_sample = training_outputs
+
+        input_sample = None
+        output_sample = None
+        if FULLSET:
+            input_sample = training_inputs
+            output_sample = training_outputs
+        else:
+            sample_inds = random.sample(range(len(training_inputs)), SAMPLE_SIZE)
+            input_sample = [training_inputs[si] for si in sample_inds]
+            output_sample = [training_outputs[si] for si in sample_inds]
+        
 
         # input_sample = training_inputs
         # output_sample = training_outputs
@@ -202,7 +208,8 @@ def learn_reward(reward_network, optimizer, training_inputs, training_outputs, n
             
             # print(actions_x.size(dim=0))
 
-            # print(states_x)
+            # print(states_x[0].size())
+            # raise NotImplementedError
 
             x_rew = reward_network.predict_reward(states_x, actions_x)
             y_rew = reward_network.predict_reward(states_y, actions_y)
@@ -243,6 +250,10 @@ def learn_reward(reward_network, optimizer, training_inputs, training_outputs, n
         optimizer.step()
 
         loss_history.append(float(loss))
+
+        if iter % 5 == 0:
+            print("check pointing")
+            torch.save(reward_network.state_dict(), f'{OUT_DIR}/rewardnet{iter}.params')
 
     # After training we save the reward function weights    
     print("check pointing")

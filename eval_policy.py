@@ -21,10 +21,20 @@ def filter_images(hidden_sizes=[32]):
 
     #POLICY_PARAMS = './rlhf/policy_checkpoint9.params'
     #POLICY_PARAMS = './reward_checkpoints/tunedalex4full_30iter_0001lr/rewardnet.params'
-    POLICY_PARAMS = './alex_checkpoints/policy_checkpoint29.params'
+    #POLICY_PARAMS = './alex_checkpoints/policy_checkpoint29.params'
+    #POLICY_PARAMS = './policy_checkpoints_implicit/policy_checkpoint29.params'\
+    #POLICY_PARAMS = './reward_checkpoints/tunedalex_victorimplicit/rewardnet.params'
+    
+    # POLICY_PARAMS = './policy_checkpoints_implicit_limited/policy_checkpoint29.params'
+    POLICY_PARAMS = './reward_checkpoints/tunedalex_victorimplicit_limited/rewardnet.params'
     OUTPUT_TXT = 'out.txt'
     #OUTPUT_DIR = './eval/test50'
-    OUTPUT_DIR = './eval/test_alexpolicy'
+    #OUTPUT_DIR = './eval/test_alexpolicy'
+    #OUTPUT_DIR = './eval/test_policy_implicit'
+    #OUTPUT_DIR = './eval/test_rewarddirect_implicit'
+
+    # OUTPUT_DIR = './eval/test_policy_implicit_limited'
+    OUTPUT_DIR = './eval/test_rewarddirect_implicit_limited'
 
     NUM_FILTER = 25#50 # how many you want to filter if loading more than that many
     IMG_DIR = './datasets/test'
@@ -47,8 +57,8 @@ def filter_images(hidden_sizes=[32]):
     #TODO temp try just reward net directly
     #logits_net = mlp(sizes=[img_dim//2]+hidden_sizes+[num_acts]).to(device)
     #logits_net.load_state_dict(torch.load(POLICY_PARAMS))
-    #logits_net = TunedAlexNet().to(device)
-    logits_net = TunedPolicyAlexNet().to(device)
+    logits_net = TunedAlexNet().to(device)
+    #logits_net = TunedPolicyAlexNet().to(device)
     logits_net.load_state_dict(torch.load(POLICY_PARAMS))
 
     # make function to compute action distribution
@@ -93,6 +103,11 @@ def filter_images(hidden_sizes=[32]):
     with torch.no_grad():
         print(len(EVAL_IMGS), EVAL_IMGS)
         actions = []
+
+        isExist = os.path.exists(f'{OUTPUT_DIR}')
+        if not isExist:
+            # Create a new directory because it does not exist
+            os.makedirs(f'{OUTPUT_DIR}')    
                 
         for img_file in EVAL_IMGS:
             # Do the filtering

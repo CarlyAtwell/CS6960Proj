@@ -1,8 +1,13 @@
 # Current user preference file to use if doing explicit preferences (Experiment 1)
 # Generated from ./gui/preferences_gui.py
-PREF_FILE = './gui/230Prefs_2_newdirs.txt'
+#PREF_FILE = './gui/230Prefs_2_newdirs.txt'
+#PREF_FILE = './victor_manual_implicit.txt'
+PREF_FILE = './victor_manual_implicit_limited.txt'
 
-OUT_DIR = './reward_checkpoints/tunedalex5full'
+OUT_DIR = './reward_checkpoints/tunedalex_victorimplicit_limited'
+FULLSET = False # If we set fullset, we don't random sample but just use the full thing
+SAMPLE_SIZE = 300
+
 # CHECKPOINT_FILE = './reward_checkpoints/tunedalex/reward_230Prefs_2.params'
 # EVAL_FILE = './reward_checkpoints/tunedalex/reward_230Prefs_2.txt'
 
